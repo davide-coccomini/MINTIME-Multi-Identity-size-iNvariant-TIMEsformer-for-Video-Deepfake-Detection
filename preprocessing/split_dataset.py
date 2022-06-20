@@ -1,3 +1,9 @@
+# ForgeryNet provided a training set and a validation set but not a complete test set. With this code, the validation set is moved into a folder so that it can be used as a test set,
+# while a new validation set is derived from the training set. 
+# The latter is constructed so that it has a distribution of deepfake generation methods equal to that of the training set and is composed of a number of samples equal to 10% 
+# of those in the training set.
+# A plot is also generated to show the distribution of the three datasets.
+
 import os
 import argparse
 import pandas as pd
@@ -31,8 +37,9 @@ if __name__ == '__main__':
     opt = parser.parse_args()
     print(opt)
     datasets = {"train": {}, "val": {}, "test": {}}
+    
+    # Reading of the training set and extraction of its distribution excluding videos in which no faces were found.
     paths = glob.glob(f'{opt.train_faces_path}/*/**/*.mp4', recursive=True)
-
     with open(opt.training_list_file, 'r') as temp_f:
         col_count = [ len(l.split(" ")) for l in temp_f.readlines() ]
 
@@ -65,6 +72,8 @@ if __name__ == '__main__':
 
         print(skipped, "videos in training set without detected faces skipped.")
         training_counter = collections.OrderedDict(sorted(training_counter.items()))
+
+        # Construction of the validation set from the training set distribution
         total_training_samples = len(df)
         validation_size = total_training_samples/10
         total = 0
@@ -77,21 +86,21 @@ if __name__ == '__main__':
 
         validation_counter = collections.OrderedDict(sorted(validation_counter.items()))
 
-
+        # Plotting training set distribution
         names = list(training_counter.keys())
         values = list(training_counter.values())
         x = [i-0.3 for i in range(len(training_counter))]
         plt.bar(x, values, 0.3, tick_label=names, label = "Training Set")
 
-        
+        # Plotting validation set distribution        
         names = list(validation_counter.keys())
         values = list(validation_counter.values())
         x = [i for i in range(len(training_counter))]
         plt.bar(x, values, 0.3, tick_label=names, label = "Validation Set")
 
     
+    # Reading of the validation set (which will be used as a test set) and extraction of its distribution excluding videos in which no faces were found.
     skipped = 0
-
     with open(opt.validation_list_file, 'r') as temp_f:
         col_count = [ len(l.split(" ")) for l in temp_f.readlines() ]
 
@@ -126,6 +135,7 @@ if __name__ == '__main__':
         print(skipped, "videos in test set without detected faces skipped.")
     test_counter = collections.OrderedDict(sorted(test_counter.items()))
 
+    # Plotting test set distribution
     names = list(test_counter.keys())
     values = list(test_counter.values())
     
@@ -136,7 +146,7 @@ if __name__ == '__main__':
     plt.savefig(os.path.join(opt.plots_output_path, "distribution"))
 
 
-# Move files
+# Move selected training files for the validation set construction into validation folder
 for deepfake_class in datasets["train"]:
     number_of_elements = validation_counter[deepfake_class]
     extracted_elements = random.Random(seed).sample(datasets["train"][deepfake_class],number_of_elements)
@@ -152,7 +162,7 @@ for deepfake_class in datasets["train"]:
             print("Moved", index, "videos into validation set.")
         shutil.move(src_path, out_path)
     
-# Save labels
+# Generate labels csv files for the three sets
 for key in datasets:
     f = open(os.path.join(opt.faces_path, key+".csv"), 'w+')
     dataset = datasets[key]

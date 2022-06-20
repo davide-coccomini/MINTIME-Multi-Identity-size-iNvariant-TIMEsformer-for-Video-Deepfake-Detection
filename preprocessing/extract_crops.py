@@ -1,3 +1,5 @@
+# Following face detection, the json files containing the coordinates framing the faces identified by the MTCNN must be converted into images. 
+
 import argparse
 import json
 import os
@@ -21,16 +23,19 @@ from tqdm import tqdm
 
 
 def extract_video(video, data_path):
-
-    bboxes_path = data_path +  "/boxes" + video.split("Training/video")[-1].split(".")[0] + ".json"
+    # Composes the path where the coordinates of the detected faces were saved
+    bboxes_path = data_path +  "/boxes" + video.split("video")[-1].split(".")[0] + ".json"
     if not os.path.exists(bboxes_path) or not os.path.exists(video):
         print(bboxes_path, "not found")
         return
+
+    # Load the json dictionary and the corresponding video
     with open(bboxes_path, "r") as bbox_f:
         bboxes_dict = json.load(bbox_f)
     capture = cv2.VideoCapture(video)
     frames_num = int(capture.get(cv2.CAP_PROP_FRAME_COUNT))
    
+    # For each frame, save the detected faces into files
     counter = 0
     for i in range(frames_num):
         capture.grab()
@@ -49,27 +54,24 @@ def extract_video(video, data_path):
             xmin, ymin, xmax, ymax = [int(b * 2) for b in bbox]
             w = xmax - xmin
             h = ymax - ymin
+
+            # Add some padding to catch background too
             p_h = h // 3
             p_w = w // 3
            
-            '''
-            if h > w:
-                p_w += int((h - w)/2)
-            else:
-                p_h += int((w - h)/2)
-            '''
-
             crop_h = (ymax + p_h) - max(ymin - p_h, 0)
             crop_w = (xmax + p_w) - max(xmin - p_w, 0)
 
+            # Make the image square
             if crop_h > crop_w:
                 p_h -= int(((crop_h - crop_w)/2))
             else:
                 p_w -= int(((crop_w - crop_h)/2))
 
-            
-
+            # Extract the face from the frame
             crop = frame[max(ymin - p_h, 0):ymax + p_h, max(xmin - p_w, 0):xmax + p_w]
+            
+            # Check if out of bound and correct
             h, w = crop.shape[:2]
             if h > w:
                 diff = int((h - w)/2)
@@ -84,9 +86,10 @@ def extract_video(video, data_path):
                 else:
                     crop = crop[:,:-1]
 
-
+            # Add the extracted face to the list
             crops.append(crop)
 
+        # Save the extracted faces into files
         tmp = video.split("release")[1]
         out_dir = opt.output_path + tmp
         os.makedirs(out_dir, exist_ok=True)
@@ -95,8 +98,6 @@ def extract_video(video, data_path):
                 cv2.imwrite(os.path.join(out_dir, "{}_{}.png".format(i, j)), crop)
             except:
                 print("Error writing image")
-    #if counter == 0:
-        #print(video, counter)
     
     
 
@@ -109,73 +110,26 @@ if __name__ == '__main__':
                         help='Videos directory')
     parser.add_argument('--output_path', default='../../datasets/ForgeryNet/Training/crops', type=str,
                         help='Output directory')
+    parser.add_argument('--gpu_id', default=0, type=int,
+                        help='ID of GPU to be used')
+    parser.add_argument('--workers', default=40, type=int,
+                        help='Number of data loader workers.')
 
     opt = parser.parse_args()
     print(opt)
+
+    # Read the dataset
     with open(opt.list_file, 'r') as temp_f:
         col_count = [ len(l.split(" ")) for l in temp_f.readlines() ]
-
     column_names = [i for i in range(0, max(col_count))]
-    
-
-    
     os.makedirs(opt.output_path, exist_ok=True)
-    #excluded_videos = os.listdir(os.path.join(opt.output_dir)) # Useful to avoid to extract from already extracted videos
-    #excluded_videos = os.listdir(opt.output_path)
     df = pd.read_csv(opt.list_file, sep=' ', names=column_names)
-   
-
     videos_paths = df.values.tolist()
-
     videos_paths = list(dict.fromkeys([os.path.join(opt.data_path, "video", os.path.dirname(row[1].split(" ")[0]), "video.mp4") for row in videos_paths]))
 
-    with Pool(processes=cpu_count()-2) as p:
+    # Start face extraction
+    with Pool(processes=opt.workers) as p:
         with tqdm(total=len(videos_paths)) as pbar:
             for v in p.imap_unordered(partial(extract_video, data_path=opt.data_path), videos_paths):
                 pbar.update()
 
-
-
-
-
-
-def scale_bounding_box(coords, height, width, scale=1.2, minsize=None):
-    """
-    Transforms bounding boxes to square and muptilpies it with a scale
-    """
-    if len(coords) == 3:
-        x1, y1, size_bb = coords
-        x1, y1, x2, y2 = x1, y1, x1 + size_bb, y1 + size_bb
-    else:
-        x1, y1, x2, y2 = coords
-    size_bb = int(max(x2 - x1, y2 - y1) * scale)
-    if minsize:
-        if size_bb < minsize:
-            size_bb = minsize
-    center_x, center_y = (x1 + x2) // 2, (y1 + y2) // 2
-    # Check for out of bounds, x-y top left corner
-    x1 = max(int(center_x - size_bb // 2), 0)
-    y1 = max(int(center_y - size_bb // 2), 0)
-    # Check for too big bb size for given x, y
-    size_bb = min(width - x1, size_bb)
-    size_bb = min(height - y1, size_bb)
-    return x1, y1, x1 + size_bb, y1 + size_bb
-
-
-def isotropically_resize_image(
-    img, size, interpolation_down=cv2.INTER_AREA, interpolation_up=cv2.INTER_CUBIC
-):
-    h, w = img.shape[:2]
-    if max(w, h) == size:
-        return img
-    if w > h:
-        scale = size / w
-        h = h * scale
-        w = size
-    else:
-        scale = size / h
-        w = w * scale
-        h = size
-    interpolation = interpolation_up if scale > 1 else interpolation_down
-    resized = cv2.resize(img, (int(w), int(h)), interpolation=interpolation)
-    return resized

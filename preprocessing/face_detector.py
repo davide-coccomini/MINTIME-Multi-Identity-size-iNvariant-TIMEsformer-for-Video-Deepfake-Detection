@@ -1,3 +1,5 @@
+# File containing classes used for face detection. 
+
 import os
 os.environ["MKL_NUM_THREADS"] = "1"
 os.environ["NUMEXPR_NUM_THREADS"] = "1"
@@ -32,6 +34,7 @@ class VideoFaceDetector(ABC):
         pass
 
 
+# Class implementing the MTCNN performing face detection
 class FacenetDetector(VideoFaceDetector):
 
     def __init__(self, device="cuda:0") -> None:
@@ -55,7 +58,7 @@ class FacenetDetector(VideoFaceDetector):
     def _batch_size(self):
         return 32
 
-
+# Class for managing videos on which to perform face detection. The video is divided into frames when returned by getitem().
 class VideoDataset(Dataset):
 
     def __init__(self, videos) -> None:

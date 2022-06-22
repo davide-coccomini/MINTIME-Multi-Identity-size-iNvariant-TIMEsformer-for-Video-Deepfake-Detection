@@ -1,3 +1,8 @@
+# Since several subjects can be found within a video, it is necessary to cluster them into groups based on similarity. 
+# This operation is carried out in the following code with additional attention to maintaining the temporal coherence of faces.
+# The extracted faces are reorganised into consecutive sequences of similar faces so as to be more suitable for network processing.
+
+
 import argparse
 import os
 import glob
@@ -34,7 +39,7 @@ if __name__ == '__main__':
     opt = parser.parse_args()
     print(opt)
 
-    # TODO: Get all the paths of the videos to be clustered 
+    # Get all the paths of the videos to be clustered 
     for dataset in os.listdir(opt.faces_path):
         dataset_path = os.path.join(opt.faces_path, dataset)
         if not os.path.isdir(dataset_path):
@@ -45,7 +50,7 @@ if __name__ == '__main__':
         set_paths = glob.glob(f'{dataset_path}/*/**/*.mp4', recursive=True)
     
 
-        # TODO: Initialize the features extractor
+        # Initialize the features extractor
         embeddings_extractor = InceptionResnetV1(pretrained='vggface2').eval().to(opt.gpu_id)
         transformation = transforms.Compose([
             transforms.Resize((299, 299)),
@@ -53,10 +58,10 @@ if __name__ == '__main__':
             fixed_image_standardization
         ])
         
-        # TODO: For each video in each set, perform faces clustering
+        # For each video in each set, perform faces clustering
         bar = ChargingBar('Clustered videos', max=(len(set_paths)))
         for path in set_paths:
-            # TODO: Read all faces, load them into a dictionary and save the maximum number of detected faces
+            # Read all faces, load them into a dictionary and save the maximum number of detected faces
             faces = []
             faces_ids = []
             faces_files = [face_file for face_file in os.listdir(path) if not os.path.isdir(os.path.join(path, face_file))]

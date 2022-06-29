@@ -151,7 +151,7 @@ for deepfake_class in datasets["train"]:
     number_of_elements = validation_counter[deepfake_class]
     extracted_elements = random.Random(seed).sample(datasets["train"][deepfake_class],number_of_elements)
     for index, video_name in enumerate(extracted_elements):
-        out_path = os.path.join(opt.validation_set_output_path, video_name.split("Training/video")[-1])
+        out_path = os.path.join(opt.validation_set_output_path, video_name.split("Training/video")[-1]).replace("val/train", "val")
         src_path = os.path.join(opt.faces_path, video_name).replace("train_video_release", "train")
         datasets["train"][deepfake_class].remove(video_name)
         if deepfake_class in datasets["val"]:

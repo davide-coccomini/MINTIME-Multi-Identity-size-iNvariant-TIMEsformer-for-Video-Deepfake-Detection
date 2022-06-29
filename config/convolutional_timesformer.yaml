@@ -1,0 +1,74 @@
+training:
+  lr: 0.01
+  weight-decay: 0.0001
+  bs: 3
+  val_bs: 1
+  scheduler: 'steplr'
+  gamma: 0.1
+  step-size: 15
+
+
+model:
+  image-size: 224
+  patch-size: 14
+  num-classes: 1
+  num-frames: 16
+  num-patches: 112
+  dim: 512
+  depth: 6 
+  dim-head: 64
+  channels: 3
+  heads: 8
+  emb-dim: 32
+  attn-dropout: 0.
+  ff-dropout: 0.
+  efficient-net-block: 9
+  rotary-emb: False
+  shift-tokens: False
+
+
+
+#model:
+#  image-size: 224
+#  patch-size: 7
+#  num-classes: 1
+#  num-frames: 8
+#  num-patches: 1280
+#  dim: 512
+#  depth: 6 
+#  dim-head: 64
+#  channels: 3
+#  heads: 8
+#  emb-dim: 32
+#  attn-dropout: 0.
+#  ff-dropout: 0.
+#  efficient-net-block: 20
+#  rotary-emb: False
+#  shift-tokens: False
+
+
+#
+#torch.Size([64, 1280, 7, 7])
+#torch.Size([8, 10240, 1024])
+#
+
+
+#model:
+#  image-size: 224
+#  patch-size: 14
+#  num-classes: 1
+#  num-frames: 16
+#  num-patches: 80
+#  dim: 1024
+#  depth: 6 
+#  dim-head: 64
+#  channels: 3
+#  heads: 16
+#  emb-dim: 32
+#  attn-dropout: 0.
+#  ff-dropout: 0.
+#  efficient-net-block: 6
+#  rotary-emb: False
+#  shift-tokens: False
+
+

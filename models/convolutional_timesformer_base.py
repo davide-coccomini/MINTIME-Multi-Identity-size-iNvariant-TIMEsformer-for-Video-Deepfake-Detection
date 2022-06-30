@@ -3,7 +3,6 @@ from torch import nn, einsum
 import torch.nn.functional as F
 from einops import rearrange, repeat
 
-from models.utils import apply_rot_emb, AxialRotaryEmbedding, RotaryEmbedding
 from models.efficientnet.efficientnet_pytorch import EfficientNet
 
 
@@ -117,10 +116,7 @@ class Attention(nn.Module):
         cls_out = attn(cls_q, k, v, mask = cls_mask)
         # rearrange across time or space
         q_, k_, v_ = map(lambda t: rearrange(t, f'{einops_from} -> {einops_to}', **einops_dims), (q_, k_, v_))
-        # add rotary embeddings, if applicable
-        if exists(rot_emb):
-            q_, k_ = apply_rot_emb(q_, k_, rot_emb)
-
+       
         # expand cls token keys and values across time or space and concat
         r = q_.shape[0] // cls_k.shape[0]
         cls_k, cls_v = map(lambda t: repeat(t, 'b () d -> (b r) () d', r = r), (cls_k, cls_v))
@@ -165,7 +161,6 @@ class ConvolutionalTimeSformer(nn.Module):
         self.dim_head = config['model']['dim-head']
         self.attn_dropout = config['model']['attn-dropout']
         self.ff_dropout = config['model']['ff-dropout']
-        self.rotary_emb = config['model']['rotary-emb']
         self.shift_tokens = config['model']['shift-tokens']
         self.efficient_net_block = config['model']['efficient-net-block']
         self.efficient_net = EfficientNet.from_pretrained('efficientnet-b0')
@@ -179,16 +174,13 @@ class ConvolutionalTimeSformer(nn.Module):
         num_positions = self.num_frames * self.num_patches
         patch_dim = self.patch_size ** 2
 
+ 
+
         self.to_patch_embedding = nn.Linear(patch_dim, self.dim)
         self.cls_token = nn.Parameter(torch.randn(1, self.dim))
-        #self.size_token = nn.Parameter(torch.randn(1, self.dim))
-
-        self.use_rotary_emb = self.rotary_emb
-        if self.rotary_emb:
-            self.frame_rot_emb = RotaryEmbedding(self.dim_head)
-            self.image_rot_emb = AxialRotaryEmbedding(self.dim_head)
-        else:
-            self.pos_emb = nn.Embedding(num_positions + 1, self.dim)
+     
+        self.pos_emb = nn.Embedding(num_positions + 1, self.dim)
+        self.size_emb = nn.Embedding(num_positions + 1, self.dim)
 
 
         self.layers = nn.ModuleList([])
@@ -208,7 +200,7 @@ class ConvolutionalTimeSformer(nn.Module):
             nn.Linear(self.dim, self.num_classes)
         )
 
-    def forward(self, x, mask = None):
+    def forward(self, x, mask = None, size_embedding = None):
         b, f, h, w, _, *_, device, p = *x.shape, x.device, self.patch_size
         hp, wp = (h // p), (w // p)
         n = hp * wp
@@ -221,17 +213,16 @@ class ConvolutionalTimeSformer(nn.Module):
         
         # add cls token
         cls_token = repeat(self.cls_token, 'n d -> b n d', b = b)
-        #size_token = repeat(self.size_token, 'n d -> s n d', s = b)
         x =  torch.cat((cls_token, tokens), dim = 1)
-
         # positional embedding
-        frame_pos_emb = None
-        image_pos_emb = None
-        if not self.use_rotary_emb:
-            x += self.pos_emb(torch.arange(x.shape[1], device = device))
-        else:
-            frame_pos_emb = self.frame_rot_emb(f, device = device)
-            image_pos_emb = self.image_rot_emb(hp, wp, device = device)
+        x += self.pos_emb(torch.arange(x.shape[1], device = device))
+        
+        # size embedding
+        size_embedding = repeat(size_embedding, 'b f -> p b f', p=self.num_patches) 
+        size_embedding = rearrange(size_embedding, 'p b f -> (p b f)')
+        size_embedding = torch.cat((torch.tensor([0]), size_embedding), dim = 0)
+        size_embedding = size_embedding.to(device)
+        x += self.size_emb(size_embedding)
 
         # calculate masking for uneven number of frames
 
@@ -241,8 +232,8 @@ class ConvolutionalTimeSformer(nn.Module):
         # time and space attention
 
         for (time_attn, spatial_attn, ff) in self.layers:
-            x = time_attn(x, 'b (f n) d', '(b n) f d', n = n, mask = frame_mask, cls_mask = cls_attn_mask, rot_emb = frame_pos_emb) + x
-            x = spatial_attn(x, 'b (f n) d', '(b f) n d', f = f, cls_mask = cls_attn_mask, rot_emb = image_pos_emb) + x
+            x = time_attn(x, 'b (f n) d', '(b n) f d', n = n, mask = frame_mask, cls_mask = cls_attn_mask) + x
+            x = spatial_attn(x, 'b (f n) d', '(b f) n d', f = f, cls_mask = cls_attn_mask) + x
             x = ff(x) + x
 
         cls_token = x[:, 0]

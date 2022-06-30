@@ -41,7 +41,7 @@ if __name__ == "__main__":
     parser.add_argument('--train_list_file', default="../datasets/ForgeryNet/faces/train.csv", type=str,
                         help='Training List txt file path)')
     parser.add_argument('--validation_list_file', default="../datasets/ForgeryNet/faces/val.csv", type=str,
-                        help='Training List txt file path)')
+                        help='Validation List txt file path)')
     parser.add_argument('--num_epochs', default=300, type=int,
                         help='Number of training epochs.')
     parser.add_argument('--workers', default=1, type=int,
@@ -96,13 +96,13 @@ if __name__ == "__main__":
     df_validation = df_validation.sample(frac=1, random_state=42).reset_index(drop=True)
 
     train_videos = df_train['video'].tolist()
-    #train_videos = train_videos[:24]
+    train_videos = train_videos[:24]
     train_labels = df_train['label'].tolist()
-    #train_labels = train_labels[:24]
+    train_labels = train_labels[:24]
     validation_videos = df_validation['video'].tolist()
-    #validation_videos = validation_videos[:24]
+    validation_videos = validation_videos[:24]
     validation_labels = df_validation['label'].tolist()
-    #validation_labels = validation_labels[:24]
+    validation_labels = validation_labels[:24]
 
     train_samples = len(train_videos)
     validation_samples = len(validation_videos)
@@ -132,7 +132,7 @@ if __name__ == "__main__":
                                  worker_init_fn=None, prefetch_factor=2,
                                  persistent_workers=False)
 
-    validation_dataset = DeepFakesDataset(validation_videos, validation_labels, config['model']['image-size'], sequence_length=config['model']['num-frames'], mode='validation')
+    validation_dataset = DeepFakesDataset(validation_videos, validation_labels, config['model']['image-size'], sequence_length=config['model']['num-frames'], mode='val')
     val_dl = torch.utils.data.DataLoader(validation_dataset, batch_size=config['training']['val_bs'], shuffle=True, sampler=None,
                                     batch_sampler=None, num_workers=opt.workers, collate_fn=None,
                                     pin_memory=False, drop_last=False, timeout=0,
@@ -157,13 +157,12 @@ if __name__ == "__main__":
         train_correct = 0
         positive = 0
         negative = 0
-        for index, (videos, masks, labels) in enumerate(train_dl):
-            
+        for index, (videos, size_embeddings, masks, labels) in enumerate(train_dl):
             labels = labels.unsqueeze(1).float()
             videos = videos.cuda()
             masks = masks.cuda()
 
-            y_pred = model(videos, mask=masks)
+            y_pred = model(videos, mask=masks, size_embedding=size_embeddings)
             
             videos = videos.cpu()
             masks = masks.cpu()
@@ -197,11 +196,11 @@ if __name__ == "__main__":
         val_counter = 0
         train_correct /= train_samples
         total_loss /= counter
-        for index, (val_videos, masks, val_labels) in enumerate(val_dl):
+        for index, (val_videos, size_embeddings, masks, val_labels) in enumerate(val_dl):
             val_videos = val_videos.cuda()
             val_labels = val_labels.unsqueeze(1).float()
 
-            val_pred = model(val_videos, mask=masks)
+            val_pred = model(val_videos, mask=masks, size_embedding=size_embeddings)
             val_videos = val_videos.cpu()
             masks = masks.cpu()
             val_pred = val_pred.cpu()

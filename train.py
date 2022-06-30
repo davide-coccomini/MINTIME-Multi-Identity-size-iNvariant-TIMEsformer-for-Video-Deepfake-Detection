@@ -97,13 +97,9 @@ if __name__ == "__main__":
     df_validation = df_validation.sample(frac=1, random_state=42).reset_index(drop=True)
 
     train_videos = df_train['video'].tolist()
-    train_videos = train_videos
     train_labels = df_train['label'].tolist()
-    train_labels = train_labels
     validation_videos = df_validation['video'].tolist()
-    validation_videos = validation_videos
     validation_labels = df_validation['label'].tolist()
-    validation_labels = validation_labels
 
     train_samples = len(train_videos)
     validation_samples = len(validation_videos)
@@ -205,6 +201,7 @@ if __name__ == "__main__":
         train_correct /= train_samples
         total_loss /= counter
         for index, (videos, size_embeddings, masks, labels) in enumerate(val_dl):
+            b, f, _, _, _= videos.shape
             videos = videos.cuda()
             masks = masks.cuda()
             labels = labels.unsqueeze(1).float()

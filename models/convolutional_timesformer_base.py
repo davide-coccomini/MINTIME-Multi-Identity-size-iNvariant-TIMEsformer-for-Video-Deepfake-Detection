@@ -181,7 +181,6 @@ class ConvolutionalTimeSformer(nn.Module):
 
         self.to_patch_embedding = nn.Linear(patch_dim, self.dim)
         self.cls_token = nn.Parameter(torch.randn(1, self.dim))
-        #self.size_token = nn.Parameter(torch.randn(1, self.dim))
 
         self.use_rotary_emb = self.rotary_emb
         if self.rotary_emb:

@@ -4,14 +4,13 @@ import torch.nn.functional as F
 from einops import rearrange, repeat
 
 from models.efficientnet.efficientnet_pytorch import EfficientNet
-
+from torch.nn.init import trunc_normal_
 
 # helpers
 def exists(val):
     return val is not None
 
 # classes
-
 class PreNorm(nn.Module):
     def __init__(self, dim, fn):
         super().__init__()
@@ -189,6 +188,25 @@ class SizeInvariantTimeSformer(nn.Module):
             nn.Linear(self.dim, self.num_classes)
         )
 
+        # Initialization
+        trunc_normal_(self.pos_emb.weight, std=.02)
+        trunc_normal_(self.cls_token, std=.02)
+        trunc_normal_(self.size_emb.weight, std=.02)
+        self.apply(self._init_weights)
+
+    def _init_weights(self, m):
+        if isinstance(m, nn.Linear):
+            trunc_normal_(m.weight, std=.02)
+            if isinstance(m, nn.Linear) and m.bias is not None:
+                nn.init.constant_(m.bias, 0)
+        elif isinstance(m, nn.LayerNorm):
+            nn.init.constant_(m.bias, 0)
+            nn.init.constant_(m.weight, 1.0)
+
+    @torch.jit.ignore
+    def no_weight_decay(self):
+        return {'pos_emb', 'cls_token', 'size_emb'}
+
     def forward(self, x, mask = None, size_embedding = None):
         b, f, c, h, w, *_, device = *x.shape, x.device
         n = h * w
@@ -198,6 +216,7 @@ class SizeInvariantTimeSformer(nn.Module):
         # add cls token
         cls_token = repeat(self.cls_token, 'n d -> b n d', b = b)
         x =  torch.cat((cls_token, tokens), dim = 1)
+
         # positional embedding
         x += self.pos_emb(torch.arange(x.shape[1], device = device))
         

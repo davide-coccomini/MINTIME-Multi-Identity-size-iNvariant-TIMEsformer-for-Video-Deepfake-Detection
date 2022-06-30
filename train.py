@@ -22,7 +22,8 @@ from models.baseline import Baseline
 from efficientnet_pytorch import EfficientNet
 from deepfakes_dataset import DeepFakesDataset
 from timesformer_pytorch import TimeSformer
-from models.convolutional_timesformer_base import ConvolutionalTimeSformer
+from models.size_invariant_timesformer import SizeInvariantTimeSformer
+from models.efficientnet.efficientnet_pytorch import EfficientNet
 
 BASE_DIR = './'
 DATA_DIR = os.path.join(BASE_DIR, "datasets/ForgeryNet/faces")
@@ -67,7 +68,7 @@ if __name__ == "__main__":
     if opt.model == 0:
         model = Baseline()
     else:
-        model = ConvolutionalTimeSformer(config=config)
+        model = SizeInvariantTimeSformer(config=config)
       
     model.train()
     
@@ -96,13 +97,13 @@ if __name__ == "__main__":
     df_validation = df_validation.sample(frac=1, random_state=42).reset_index(drop=True)
 
     train_videos = df_train['video'].tolist()
-    train_videos = train_videos[:24]
+    train_videos = train_videos
     train_labels = df_train['label'].tolist()
-    train_labels = train_labels[:24]
+    train_labels = train_labels
     validation_videos = df_validation['video'].tolist()
-    validation_videos = validation_videos[:24]
+    validation_videos = validation_videos
     validation_labels = df_validation['label'].tolist()
-    validation_labels = validation_labels[:24]
+    validation_labels = validation_labels
 
     train_samples = len(train_videos)
     validation_samples = len(validation_videos)
@@ -140,8 +141,8 @@ if __name__ == "__main__":
                                     persistent_workers=False)
 
     
-
-    model = model.cuda()
+    features_extractor = EfficientNet.from_pretrained('efficientnet-b0')
+ 
     counter = 0
     not_improved_loss = 0
     previous_loss = math.inf
@@ -158,17 +159,24 @@ if __name__ == "__main__":
         positive = 0
         negative = 0
         for index, (videos, size_embeddings, masks, labels) in enumerate(train_dl):
+            b, f, _, _, _= videos.shape
             labels = labels.unsqueeze(1).float()
             videos = videos.cuda()
             masks = masks.cuda()
+            
+            with torch.no_grad():
+                features_extractor = features_extractor.cuda()
+                videos = rearrange(videos, 'b f h w c -> (b f) c h w')                                               # B*8 x 3 x 224 x 224
+                features = features_extractor.extract_features(videos)                                                                # B*8 x 1280 x 7 x 7
+                features = rearrange(features, '(b f) c h w -> b f c h w', b = b, f = f)                             # B x 8 x 1280 x 7 x 7
+                features_extractor = features_extractor.cpu()
 
-            y_pred = model(videos, mask=masks, size_embedding=size_embeddings)
+            model = model.cuda()
+            y_pred = model(features, mask=masks, size_embedding=size_embeddings)
             
             videos = videos.cpu()
-            masks = masks.cpu()
             y_pred = y_pred.cpu()
             loss = loss_fn(y_pred, labels)
-        
             corrects, positive_class, negative_class = check_correct(y_pred, labels)  
             train_correct += corrects
             positive += positive_class
@@ -196,17 +204,25 @@ if __name__ == "__main__":
         val_counter = 0
         train_correct /= train_samples
         total_loss /= counter
-        for index, (val_videos, size_embeddings, masks, val_labels) in enumerate(val_dl):
-            val_videos = val_videos.cuda()
-            val_labels = val_labels.unsqueeze(1).float()
+        for index, (videos, size_embeddings, masks, labels) in enumerate(val_dl):
+            videos = videos.cuda()
+            masks = masks.cuda()
+            labels = labels.unsqueeze(1).float()
 
-            val_pred = model(val_videos, mask=masks, size_embedding=size_embeddings)
-            val_videos = val_videos.cpu()
-            masks = masks.cpu()
+            with torch.no_grad():
+                features_extractor = features_extractor.cuda()
+                videos = rearrange(videos, 'b f h w c -> (b f) c h w')                                       # B*8 x 3 x 224 x 224
+                features = features_extractor.extract_features(videos)                                           # B*8 x 1280 x 7 x 7
+                features = rearrange(features, '(b f) c h w -> b f c h w', b = b, f = f)                             # B x 8 x 1280 x 7 x 7
+                features_extractor = features_extractor.cpu()
+
+
+            val_pred = model(features, mask=masks, size_embedding=size_embeddings)
+            videos = videos.cpu()
             val_pred = val_pred.cpu()
-            val_loss = loss_fn(val_pred, val_labels)
+            val_loss = loss_fn(val_pred, labels)
             total_val_loss += round(val_loss.item(), 2)
-            corrects, positive_class, negative_class = check_correct(val_pred, val_labels)
+            corrects, positive_class, negative_class = check_correct(val_pred, labels)
             val_correct += corrects
             val_positive += positive_class
             val_counter += 1

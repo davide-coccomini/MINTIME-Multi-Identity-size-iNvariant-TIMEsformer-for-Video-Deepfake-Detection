@@ -11,6 +11,7 @@ import tensorflow as tf
 import collections
 import os
 import json
+from itertools import chain
 import random
 from einops import rearrange
 import pandas as pd
@@ -74,24 +75,33 @@ if __name__ == "__main__":
 
 
     torch.cuda.set_device(opt.gpu_id) 
+    '''
     torch.backends.cudnn.deterministic = True
     random.seed(opt.random_state)
     torch.manual_seed(opt.random_state)
     torch.cuda.manual_seed(opt.random_state)
     np.random.seed(opt.random_state)
-
+    '''
+    
+    features_extractor = EfficientNet.from_pretrained('efficientnet-b0')
 
     if opt.model == 0:
         model = Baseline()
     else:
         model = SizeInvariantTimeSformer(config=config)
 
+    if opt.freeze_backbone:
+        features_extractor.eval()
+    else:
+        features_extractor.train()
+        features_extractor = features_extractor.to(opt.gpu_id)
+        model = model.to(opt.gpu_id)
+
     model.train()
-    
     if opt.freeze_backbone:
         optimizer = torch.optim.SGD(model.parameters(), lr=config['training']['lr'], weight_decay=config['training']['weight-decay'])
     else:
-        optimizer = torch.optim.SGD(model.parameters() + features_extractor.parameters(), lr=config['training']['lr'], weight_decay=config['training']['weight-decay'])
+        optimizer = torch.optim.SGD(chain(features_extractor.parameters(), model.parameters()), lr=config['training']['lr'], weight_decay=config['training']['weight-decay'])
     scheduler = lr_scheduler.StepLR(optimizer, step_size=config['training']['step-size'], gamma=config['training']['gamma'])
     starting_epoch = 0
     if os.path.exists(opt.resume):
@@ -99,10 +109,6 @@ if __name__ == "__main__":
         starting_epoch = int(opt.resume.split("checkpoint")[1].split("_")[0]) + 1 # The checkpoint's file name format should be "checkpoint_EPOCH"
     else:
         print("No checkpoint loaded.")
-
-
-    print("Model Parameters:", get_n_params(model))
-    
 
     
     # READ ALL PATHS
@@ -119,6 +125,13 @@ if __name__ == "__main__":
     train_labels = df_train['label'].tolist()
     validation_videos = df_validation['video'].tolist()
     validation_labels = df_validation['label'].tolist()
+
+    if opt.max_videos > -1:
+        train_videos = train_videos[:opt.max_videos]
+        train_labels = train_labels[:opt.max_videos]
+        validation_videos = validation_videos[:opt.max_videos]
+        validation_labels = validation_labels[:opt.max_videos]
+
 
     train_samples = len(train_videos)
     validation_samples = len(validation_videos)
@@ -161,15 +174,16 @@ if __name__ == "__main__":
                                     worker_init_fn=None, prefetch_factor=2,
                                     persistent_workers=False)
    
-    features_extractor = EfficientNet.from_pretrained('efficientnet-b0')
-    if opt.freeze_backbone:
-        features_extractor.eval()
-    else:
-        features_extractor.train()
+
     counter = 0
     not_improved_loss = 0
     previous_loss = math.inf
+
+
+    count_dict = {}
+            
     for t in range(starting_epoch, opt.num_epochs + 1):
+        model.train()
         if not_improved_loss == opt.patience:
             break
         counter = 0
@@ -181,7 +195,6 @@ if __name__ == "__main__":
         train_correct = 0
         positive = 0
         negative = 0
-        model.train()
         for index, (videos, size_embeddings, masks, labels) in enumerate(train_dl):
             b, f, _, _, _= videos.shape
             labels = labels.unsqueeze(1).float()
@@ -189,21 +202,21 @@ if __name__ == "__main__":
             masks = masks.to(opt.gpu_id)
             if opt.freeze_backbone:
                 with torch.no_grad():
+                    model = model.cpu()
                     features_extractor = features_extractor.to(opt.gpu_id)
                     videos = rearrange(videos, 'b f h w c -> (b f) c h w')                                               # B*8 x 3 x 224 x 224
                     features = features_extractor.extract_features(videos)                                               # B*8 x 1280 x 7 x 7
                     features = rearrange(features, '(b f) c h w -> b f c h w', b = b, f = f)                             # B x 8 x 1280 x 7 x 7
                     features_extractor = features_extractor.cpu()
+                    model = model.to(opt.gpu_id)
             else:
-                features_extractor = features_extractor.to(opt.gpu_id)
                 videos = rearrange(videos, 'b f h w c -> (b f) c h w')                                               # B*8 x 3 x 224 x 224
                 features = features_extractor.extract_features(videos)                                               # B*8 x 1280 x 7 x 7
                 features = rearrange(features, '(b f) c h w -> b f c h w', b = b, f = f)                             # B x 8 x 1280 x 7 x 7
-                features_extractor = features_extractor.cpu()
-
-            model = model.to(opt.gpu_id)
-            y_pred = model(features, mask=masks, size_embedding=size_embeddings)
             
+            y_pred = model(features, mask=masks, size_embedding=size_embeddings)
+         
+
             videos = videos.cpu()
             y_pred = y_pred.cpu()
             loss = loss_fn(y_pred, labels)
@@ -215,7 +228,6 @@ if __name__ == "__main__":
             
             loss.backward()
             
-            optimizer.step()
             counter += 1
             total_loss += round(loss.item(), 2)
             
@@ -242,13 +254,17 @@ if __name__ == "__main__":
             labels = labels.unsqueeze(1).float()
 
             with torch.no_grad():
-                
-                features_extractor = features_extractor.to(opt.gpu_id)
+                if opt.freeze_backbone:
+                    model = model.cpu()
+                    features_extractor = features_extractor.to(opt.gpu_id)
+
                 videos = rearrange(videos, 'b f h w c -> (b f) c h w')                                       # B*8 x 3 x 224 x 224
                 features = features_extractor.extract_features(videos)                                           # B*8 x 1280 x 7 x 7
-                features = rearrange(features, '(b f) c h w -> b f c h w', b = b, f = f)                             # B x 8 x 1280 x 7 x 7
-                features_extractor = features_extractor.cpu()
-
+                features = rearrange(features, '(b f) c h w -> b f c h w', b = b, f = f)   
+                
+                if opt.freeze_backbone:
+                    features_extractor = features_extractor.cpu()
+                    model = model.to(opt.gpu_id)
                 val_pred = model(features, mask=masks, size_embedding=size_embeddings)
                 videos = videos.cpu()
                 val_pred = val_pred.cpu()

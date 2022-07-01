@@ -25,14 +25,14 @@ END_TUPLE = ("N/A", np.inf)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--faces_path', default="../../datasets/ForgeryNet/faces_test", type=str,
+    parser.add_argument('--faces_path', default="../../datasets/ForgeryNet/faces", type=str,
                         help='Path of folder containing train/val/test with extracted cropped faces to be clustered.')
     parser.add_argument('--gpu_id', default=0, type=int,
                         help='ID of GPU to be used.')
-    parser.add_argument('--similarity_threshold', default=0.6, type=float,
+    parser.add_argument('--similarity_threshold', default=0.8, type=float,
                         help='Threshold used to understand if the face has been skipped in the next frame and search in the next one.')
     parser.add_argument('--min_faces_number_per_sequence', default=3, type=int,
-                        help='Minimum number of faces per sequence to be considered')
+                        help='Minimum number of faces per sequence to be considered.')
     parser.add_argument('--workers', default=40, type=int,
                         help='Number of data loader workers.')
 
@@ -61,7 +61,7 @@ if __name__ == '__main__':
         # For each video in each set, perform faces clustering
         bar = ChargingBar('Clustered videos', max=(len(set_paths)))
         for path in set_paths:
-            # Read all faces, load them into a dictionary and save the maximum number of detected faces
+            # Read all faces, load them into a dictionary 
             faces = []
             faces_ids = []
             faces_files = [face_file for face_file in os.listdir(path) if not os.path.isdir(os.path.join(path, face_file))]
@@ -73,7 +73,6 @@ if __name__ == '__main__':
                 frame_number = int(os.path.splitext(face_file)[0].split("_")[0])
                 face = np.transpose(transformation(face_image), (2, 0, 1))
                 faces.append(np.asarray(face))
-                face_index = int(os.path.splitext(face_file)[0].split("_")[1]) + 1
                
 
 

@@ -88,7 +88,8 @@ if __name__ == "__main__":
         features_extractor = EfficientNet.from_pretrained('efficientnet-b0')
     else:
         features_extractor = EfficientNet.from_name('efficientnet-b0')
-        features_extractor.load_state_dict(torch.load(opt.extractor_weights))
+        features_extractor.load_matching_state_dict(torch.load(opt.extractor_weights))
+        print("Custom features extractor weights loaded.")
 
     if opt.model == 0:
         model = Baseline()

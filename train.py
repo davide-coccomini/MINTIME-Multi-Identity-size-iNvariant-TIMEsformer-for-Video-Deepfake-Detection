@@ -4,12 +4,14 @@ import argparse
 from tqdm import tqdm
 import math
 import yaml
-from utils import get_n_params, shuffle_dataset, check_correct
+from utils import get_n_params, check_correct
 from sklearn.utils.class_weight import compute_class_weight 
 from torch.optim.lr_scheduler import LambdaLR
+import tensorflow as tf
 import collections
 import os
 import json
+import random
 from einops import rearrange
 import pandas as pd
 from os import cpu_count
@@ -18,12 +20,11 @@ from functools import partial
 from multiprocessing import Manager
 from progress.bar import ChargingBar
 from torch.optim import lr_scheduler
-from models.baseline import Baseline
-from efficientnet_pytorch import EfficientNet
 from deepfakes_dataset import DeepFakesDataset
-from timesformer_pytorch import TimeSformer
 from models.size_invariant_timesformer import SizeInvariantTimeSformer
 from models.efficientnet.efficientnet_pytorch import EfficientNet
+from torch.utils.tensorboard import SummaryWriter
+
 
 BASE_DIR = './'
 DATA_DIR = os.path.join(BASE_DIR, "datasets/ForgeryNet/faces")
@@ -34,9 +35,9 @@ MODELS_PATH = "outputs/models"
 
 
 
+
 # Main body
 if __name__ == "__main__":
-    
     parser = argparse.ArgumentParser()
     
     parser.add_argument('--train_list_file', default="../datasets/ForgeryNet/faces/train.csv", type=str,
@@ -45,8 +46,14 @@ if __name__ == "__main__":
                         help='Validation List txt file path)')
     parser.add_argument('--num_epochs', default=300, type=int,
                         help='Number of training epochs.')
-    parser.add_argument('--workers', default=1, type=int,
+    parser.add_argument('--workers', default=8, type=int,
                         help='Number of data loader workers.')
+    parser.add_argument('--random_state', default=42, type=int,
+                        help='Random state value')
+    parser.add_argument('--freeze_backbone', default=False, type=bool,
+                        help='Maintain the backbone freezed or train it.')
+    parser.add_argument('--gpu_id', default=0, type=int,
+                        help='ID of GPU to be used.')
     parser.add_argument('--resume', default='', type=str, metavar='PATH',
                         help='Path to latest checkpoint (default: none).')
     parser.add_argument('--max_videos', type=int, default=-1, 
@@ -57,22 +64,34 @@ if __name__ == "__main__":
                         help="Which model to use. (0: Baseline | 1: Convolutional TimeSformer).")
     parser.add_argument('--patience', type=int, default=5, 
                         help="How many epochs wait before stopping for validation loss not improving.")
-    
+    parser.add_argument('--logger_name', default='runs/train',
+                        help='Path to save the model and Tensorboard log.')
     opt = parser.parse_args()
+    
     print(opt)
-
     with open(opt.config, 'r') as ymlfile:
         config = yaml.safe_load(ymlfile)
- 
+
+
+    torch.cuda.set_device(opt.gpu_id) 
+    torch.backends.cudnn.deterministic = True
+    random.seed(opt.random_state)
+    torch.manual_seed(opt.random_state)
+    torch.cuda.manual_seed(opt.random_state)
+    np.random.seed(opt.random_state)
+
 
     if opt.model == 0:
         model = Baseline()
     else:
         model = SizeInvariantTimeSformer(config=config)
-      
+
     model.train()
     
-    optimizer = torch.optim.SGD(model.parameters(), lr=config['training']['lr'], weight_decay=config['training']['weight-decay'])
+    if opt.freeze_backbone:
+        optimizer = torch.optim.SGD(model.parameters(), lr=config['training']['lr'], weight_decay=config['training']['weight-decay'])
+    else:
+        optimizer = torch.optim.SGD(model.parameters() + features_extractor.parameters(), lr=config['training']['lr'], weight_decay=config['training']['weight-decay'])
     scheduler = lr_scheduler.StepLR(optimizer, step_size=config['training']['step-size'], gamma=config['training']['gamma'])
     starting_epoch = 0
     if os.path.exists(opt.resume):
@@ -93,8 +112,8 @@ if __name__ == "__main__":
     df_train = pd.read_csv(opt.train_list_file, sep=' ', names=col_names)
     df_validation = pd.read_csv(opt.validation_list_file, sep=' ', names=col_names)
     
-    df_train = df_train.sample(frac=1, random_state=42).reset_index(drop=True)
-    df_validation = df_validation.sample(frac=1, random_state=42).reset_index(drop=True)
+    df_train = df_train.sample(frac=1, random_state=opt.random_state).reset_index(drop=True)
+    df_validation = df_validation.sample(frac=1, random_state=opt.random_state).reset_index(drop=True)
 
     train_videos = df_train['video'].tolist()
     train_labels = df_train['label'].tolist()
@@ -118,6 +137,12 @@ if __name__ == "__main__":
     print(val_counters)
     print("___________________")
 
+
+    
+    tb_logger = SummaryWriter(log_dir=opt.logger_name, comment='')
+    experiment_path = tb_logger.get_logdir()
+    
+
     loss_fn = torch.nn.BCEWithLogitsLoss(pos_weight=torch.tensor([class_weights]))
 
     # Create the data loaders
@@ -135,10 +160,12 @@ if __name__ == "__main__":
                                     pin_memory=False, drop_last=False, timeout=0,
                                     worker_init_fn=None, prefetch_factor=2,
                                     persistent_workers=False)
-
-    
+   
     features_extractor = EfficientNet.from_pretrained('efficientnet-b0')
- 
+    if opt.freeze_backbone:
+        features_extractor.eval()
+    else:
+        features_extractor.train()
     counter = 0
     not_improved_loss = 0
     previous_loss = math.inf
@@ -154,20 +181,27 @@ if __name__ == "__main__":
         train_correct = 0
         positive = 0
         negative = 0
+        model.train()
         for index, (videos, size_embeddings, masks, labels) in enumerate(train_dl):
             b, f, _, _, _= videos.shape
             labels = labels.unsqueeze(1).float()
-            videos = videos.cuda()
-            masks = masks.cuda()
-            
-            with torch.no_grad():
-                features_extractor = features_extractor.cuda()
+            videos = videos.to(opt.gpu_id)
+            masks = masks.to(opt.gpu_id)
+            if opt.freeze_backbone:
+                with torch.no_grad():
+                    features_extractor = features_extractor.to(opt.gpu_id)
+                    videos = rearrange(videos, 'b f h w c -> (b f) c h w')                                               # B*8 x 3 x 224 x 224
+                    features = features_extractor.extract_features(videos)                                               # B*8 x 1280 x 7 x 7
+                    features = rearrange(features, '(b f) c h w -> b f c h w', b = b, f = f)                             # B x 8 x 1280 x 7 x 7
+                    features_extractor = features_extractor.cpu()
+            else:
+                features_extractor = features_extractor.to(opt.gpu_id)
                 videos = rearrange(videos, 'b f h w c -> (b f) c h w')                                               # B*8 x 3 x 224 x 224
-                features = features_extractor.extract_features(videos)                                                                # B*8 x 1280 x 7 x 7
+                features = features_extractor.extract_features(videos)                                               # B*8 x 1280 x 7 x 7
                 features = rearrange(features, '(b f) c h w -> b f c h w', b = b, f = f)                             # B x 8 x 1280 x 7 x 7
                 features_extractor = features_extractor.cpu()
 
-            model = model.cuda()
+            model = model.to(opt.gpu_id)
             y_pred = model(features, mask=masks, size_embedding=size_embeddings)
             
             videos = videos.cpu()
@@ -200,31 +234,32 @@ if __name__ == "__main__":
         val_counter = 0
         train_correct /= train_samples
         total_loss /= counter
+        model.eval()
         for index, (videos, size_embeddings, masks, labels) in enumerate(val_dl):
             b, f, _, _, _= videos.shape
-            videos = videos.cuda()
-            masks = masks.cuda()
+            videos = videos.to(opt.gpu_id)
+            masks = masks.to(opt.gpu_id)
             labels = labels.unsqueeze(1).float()
 
             with torch.no_grad():
-                features_extractor = features_extractor.cuda()
+                
+                features_extractor = features_extractor.to(opt.gpu_id)
                 videos = rearrange(videos, 'b f h w c -> (b f) c h w')                                       # B*8 x 3 x 224 x 224
                 features = features_extractor.extract_features(videos)                                           # B*8 x 1280 x 7 x 7
                 features = rearrange(features, '(b f) c h w -> b f c h w', b = b, f = f)                             # B x 8 x 1280 x 7 x 7
                 features_extractor = features_extractor.cpu()
 
-
-            val_pred = model(features, mask=masks, size_embedding=size_embeddings)
-            videos = videos.cpu()
-            val_pred = val_pred.cpu()
-            val_loss = loss_fn(val_pred, labels)
-            total_val_loss += round(val_loss.item(), 2)
-            corrects, positive_class, negative_class = check_correct(val_pred, labels)
-            val_correct += corrects
-            val_positive += positive_class
-            val_counter += 1
-            val_negative += negative_class
-            bar.next()
+                val_pred = model(features, mask=masks, size_embedding=size_embeddings)
+                videos = videos.cpu()
+                val_pred = val_pred.cpu()
+                val_loss = loss_fn(val_pred, labels)
+                total_val_loss += round(val_loss.item(), 2)
+                corrects, positive_class, negative_class = check_correct(val_pred, labels)
+                val_correct += corrects
+                val_positive += positive_class
+                val_counter += 1
+                val_negative += negative_class
+                bar.next()
         
         torch.cuda.empty_cache() 
 
@@ -241,6 +276,13 @@ if __name__ == "__main__":
         else:
             not_improved_loss = 0
         
+
+        tb_logger.add_scalar("Training/Accuracy", train_correct, t)
+        tb_logger.add_scalar("Training/Loss", total_loss, t)
+        tb_logger.add_scalar("Training/Learning_Rate", optimizer.param_groups[0]['lr'], t)
+        tb_logger.add_scalar("Validation/Loss", total_loss, t)
+        tb_logger.add_scalar("Validation/Accuracy", val_correct, t)
+
         previous_loss = total_val_loss
         print("#" + str(t) + "/" + str(opt.num_epochs) + " loss:" +
             str(total_loss) + " accuracy:" + str(train_correct) +" val_loss:" + str(total_val_loss) + " val_accuracy:" + str(val_correct) + " val_0s:" + str(val_negative) + "/" + str(np.count_nonzero(validation_labels == 0)) + " val_1s:" + str(val_positive) + "/" + str(np.count_nonzero(validation_labels == 1)))

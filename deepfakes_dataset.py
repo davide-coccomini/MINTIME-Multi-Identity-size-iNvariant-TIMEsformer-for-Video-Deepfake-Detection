@@ -114,7 +114,12 @@ class DeepFakesDataset(Dataset):
              
             side_ranges = list(map(lambda a_: ratio in range(a_[0], a_[1] + 1), SIZE_EMB_DICT))
             size_embeddings.append(np.where(side_ranges)[0][0]+1)
-            image = transform(image=image)['image']
+            try:
+                image = transform(image=image)['image']
+                image = np.zeros((self.image_size, self.image_size, 3))
+            except:
+                image = np.zeros((3, self.image_size, self.image_size))
+
             identity_images.append(image)
             
         size_embeddings = torch.tensor(size_embeddings)
@@ -131,8 +136,8 @@ class DeepFakesDataset(Dataset):
             mask = [1 if i < self.sequence_length - diff else 0 for i in range(self.sequence_length)]
         else:
             mask = [1 for i in range(self.sequence_length)]
-
-        return identity_images.float(), torch.tensor(size_embeddings).int(), torch.tensor(mask).bool(), self.y[index]
+        
+        return identity_images.float(), size_embeddings.int(), torch.tensor(mask).bool(), self.y[index]
 
     def __len__(self):
         return self.n_samples

@@ -8,3 +8,7 @@ config/baseline.yaml
 __pycache__
 timesformer.py
 baseline.py
+runs
+weights
+test_linear.py
+test_timesformer.py

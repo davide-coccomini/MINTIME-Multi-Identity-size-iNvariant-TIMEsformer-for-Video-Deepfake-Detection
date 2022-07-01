@@ -57,6 +57,8 @@ if __name__ == "__main__":
                         help='ID of GPU to be used.')
     parser.add_argument('--resume', default='', type=str, metavar='PATH',
                         help='Path to latest checkpoint (default: none).')
+    parser.add_argument('--extractor_weights', default='ImageNet', type=str,
+                        help='Path to extractor weights or "imagenet".')
     parser.add_argument('--max_videos', type=int, default=-1, 
                         help="Maximum number of videos to use for training (default: all).")
     parser.add_argument('--config', type=str, 
@@ -82,8 +84,11 @@ if __name__ == "__main__":
     torch.cuda.manual_seed(opt.random_state)
     np.random.seed(opt.random_state)
     '''
-    
-    features_extractor = EfficientNet.from_pretrained('efficientnet-b0')
+    if opt.extractor_weights.lower() == 'imagenet':
+        features_extractor = EfficientNet.from_pretrained('efficientnet-b0')
+    else:
+        features_extractor = EfficientNet.from_name('efficientnet-b0')
+        features_extractor.load_state_dict(torch.load(opt.extractor_weights))
 
     if opt.model == 0:
         model = Baseline()

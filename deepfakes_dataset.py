@@ -116,9 +116,8 @@ class DeepFakesDataset(Dataset):
             size_embeddings.append(np.where(side_ranges)[0][0]+1)
             try:
                 image = transform(image=image)['image']
-                image = np.zeros((self.image_size, self.image_size, 3))
             except:
-                image = np.zeros((3, self.image_size, self.image_size))
+                image = np.zeros((self.image_size, self.image_size, 3))
 
             identity_images.append(image)
             

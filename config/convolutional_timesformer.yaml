@@ -10,14 +10,14 @@ training:
 
 model:
   image-size: 224
-  patch-size: 7
+  patch-size: 1
   num-classes: 1
   num-frames: 8
   num-patches: 1280
   dim: 256 #512
   depth: 4 # 6
   dim-head: 64
-  channels: 3
+  channels: 1280
   heads: 6 # 8
   emb-dim: 32
   attn-dropout: 0.

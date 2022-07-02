@@ -19,7 +19,7 @@ seed = 42
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--training_list_file', default="../../datasets/ForgeryNet/Training/video_list_complete.txt", type=str,
+    parser.add_argument('--train_list_file', default="../../datasets/ForgeryNet/Training/video_list_complete.txt", type=str,
                         help='Videos List txt file path for training set (to be splitted in train and validation)')
     parser.add_argument('--validation_list_file', default="../../datasets/ForgeryNet/Validation/video_list.txt", type=str,
                         help='Videos List txt file path for validation set (our test set)')
@@ -40,11 +40,11 @@ if __name__ == '__main__':
     
     # Reading of the training set and extraction of its distribution excluding videos in which no faces were found.
     paths = glob.glob(f'{opt.train_faces_path}/*/**/*.mp4', recursive=True)
-    with open(opt.training_list_file, 'r') as temp_f:
+    with open(opt.train_list_file, 'r') as temp_f:
         col_count = [ len(l.split(" ")) for l in temp_f.readlines() ]
 
         column_names = [i for i in range(0, max(col_count))]
-        df = pd.read_csv(opt.training_list_file, sep=' ', names=column_names)
+        df = pd.read_csv(opt.train_list_file, sep=' ', names=column_names)
       
         training_counter = {}        
         column_names.reverse()

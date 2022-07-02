@@ -30,7 +30,7 @@ if __name__ == '__main__':
     parser.add_argument('--gpu_id', default=0, type=int,
                         help='ID of GPU to be used.')
     parser.add_argument('--similarity_threshold', default=0.8, type=float,
-                        help='Threshold used to understand if the face has been skipped in the next frame and search in the next one.')
+                        help='Threshold to discard faces with high distance.')
     parser.add_argument('--min_faces_number_per_sequence', default=3, type=int,
                         help='Minimum number of faces per sequence to be considered.')
     parser.add_argument('--workers', default=40, type=int,

@@ -6,6 +6,7 @@ training:
   scheduler: 'steplr'
   gamma: 0.1
   step-size: 15
+  momentum: 0.9
 
 
 model:

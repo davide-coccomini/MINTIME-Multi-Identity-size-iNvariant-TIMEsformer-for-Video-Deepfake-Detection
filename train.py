@@ -25,6 +25,8 @@ from deepfakes_dataset import DeepFakesDataset
 from models.size_invariant_timesformer import SizeInvariantTimeSformer
 from models.efficientnet.efficientnet_pytorch import EfficientNet
 from torch.utils.tensorboard import SummaryWriter
+import torch_optimizer as optim
+
 
 
 BASE_DIR = './'
@@ -53,18 +55,20 @@ if __name__ == "__main__":
                         help='Random state value')
     parser.add_argument('--freeze_backbone', default=False, type=bool,
                         help='Maintain the backbone freezed or train it.')
+    parser.add_argument('--extractor_unfreeze_blocks', type=int, default=-1, 
+                        help="How many layers unfreeze in the extractor.")
+    parser.add_argument('--extractor_weights', default='ImageNet', type=str,
+                        help='Path to extractor weights or "imagenet".')
     parser.add_argument('--gpu_id', default=0, type=int,
                         help='ID of GPU to be used.')
     parser.add_argument('--resume', default='', type=str, metavar='PATH',
                         help='Path to latest checkpoint (default: none).')
-    parser.add_argument('--extractor_weights', default='ImageNet', type=str,
-                        help='Path to extractor weights or "imagenet".')
     parser.add_argument('--max_videos', type=int, default=-1, 
                         help="Maximum number of videos to use for training (default: all).")
     parser.add_argument('--config', type=str, 
                         help="Which configuration to use. See into 'config' folder.")
     parser.add_argument('--model', type=int, 
-                        help="Which model to use. (0: Baseline | 1: Convolutional TimeSformer).")
+                        help="Which model to use. (0: Baseline | 1: Size Invariant TimeSformer).")
     parser.add_argument('--patience', type=int, default=5, 
                         help="How many epochs wait before stopping for validation loss not improving.")
     parser.add_argument('--logger_name', default='runs/train',
@@ -100,21 +104,29 @@ if __name__ == "__main__":
         features_extractor.eval()
     else:
         features_extractor.train()
+        if opt.extractor_unfreeze_blocks > -1:
+            for i in range(0, len(features_extractor._blocks)):
+                for index, param in enumerate(features_extractor._blocks[i].parameters()):
+                    if i >= len(features_extractor._blocks)-opt.extractor_unfreeze_blocks:
+                        param.requires_grad = True
+                    else:
+                        param.requires_grad = False
+            
         features_extractor = features_extractor.to(opt.gpu_id)
         model = model.to(opt.gpu_id)
 
     model.train()
     if opt.freeze_backbone:
-        optimizer = torch.optim.SGD(model.parameters(), lr=config['training']['lr'], weight_decay=config['training']['weight-decay'])
+        optimizer = torch.optim.SGD(model.parameters(), lr=config['training']['lr'], weight_decay=config['training']['weight-decay'], momentum=config['training']['momentum'])
     else:
-        optimizer = torch.optim.SGD(chain(features_extractor.parameters(), model.parameters()), lr=config['training']['lr'], weight_decay=config['training']['weight-decay'])
+        optimizer = torch.optim.SGD(chain(features_extractor.parameters(), model.parameters()), lr=config['training']['lr'], weight_decay=config['training']['weight-decay'], momentum=config['training']['momentum'])
     scheduler = lr_scheduler.StepLR(optimizer, step_size=config['training']['step-size'], gamma=config['training']['gamma'])
     starting_epoch = 0
     if os.path.exists(opt.resume):
         model.load_state_dict(torch.load(opt.resume))
         starting_epoch = int(opt.resume.split("checkpoint")[1].split("_")[0]) + 1 # The checkpoint's file name format should be "checkpoint_EPOCH"
     else:
-        print("No checkpoint loaded.")
+        print("No checkpoint loaded for TimeSformer.")
 
     
     # READ ALL PATHS
@@ -233,7 +245,7 @@ if __name__ == "__main__":
             optimizer.zero_grad()
             
             loss.backward()
-            
+            optimizer.step()
             counter += 1
             total_loss += round(loss.item(), 2)
             
@@ -271,6 +283,7 @@ if __name__ == "__main__":
                 if opt.freeze_backbone:
                     features_extractor = features_extractor.cpu()
                     model = model.to(opt.gpu_id)
+
                 val_pred = model(features, mask=masks, size_embedding=size_embeddings)
                 videos = videos.cpu()
                 val_pred = val_pred.cpu()
@@ -307,9 +320,11 @@ if __name__ == "__main__":
 
         previous_loss = total_val_loss
         print("#" + str(t) + "/" + str(opt.num_epochs) + " loss:" +
-            str(total_loss) + " accuracy:" + str(train_correct) +" val_loss:" + str(total_val_loss) + " val_accuracy:" + str(val_correct) + " val_0s:" + str(val_negative) + "/" + str(np.count_nonzero(validation_labels == 0)) + " val_1s:" + str(val_positive) + "/" + str(np.count_nonzero(validation_labels == 1)))
+            str(total_loss) + " accuracy:" + str(train_correct) +" val_loss:" + str(total_val_loss) + " val_accuracy:" + str(val_correct) + " val_0s:" + str(val_negative) + "/" + str(val_counters[0]) + " val_1s:" + str(val_positive) + "/" + str(val_counters[1]))
     
         if not os.path.exists(MODELS_PATH):
             os.makedirs(MODELS_PATH)
-        torch.save(model.state_dict(), os.path.join(MODELS_PATH,  "ConvolutionalTimeSformer_checkpoint" + str(t)))
+        
+        torch.save(features_extractor.state_dict(), os.path.join(MODELS_PATH,  "EfficientNetExtractor_checkpoint" + str(t)))
+        torch.save(model.state_dict(), os.path.join(MODELS_PATH,  "SizeInvariantTimeSformer_checkpoint" + str(t)))
         

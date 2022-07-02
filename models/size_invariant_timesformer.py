@@ -138,7 +138,6 @@ class Attention(nn.Module):
         # combine heads out
         return self.to_out(out)
 
-# main classes
 
 class SizeInvariantTimeSformer(nn.Module):
     def __init__(

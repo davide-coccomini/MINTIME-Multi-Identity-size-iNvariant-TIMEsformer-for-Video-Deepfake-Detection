@@ -271,6 +271,21 @@ The dataset at the end of this process will have the following structure:
 The training phase is divided into two distinct phases. A first phase designed to perform the end-to-end training of the proposed Size-Invariant TimeSformer using only one identity per video. 
 In the second step, an Identity Network is trained to perform the final classification for all identities of the same video from the features extracted by the model obtained in the previous step.
 
+To download the pretrained weights of the models you can run the following commands:
+(Efficient ViT)
+```
+mkdir weights
+cd weights
+wget ...
+wget ...
+wget ...
+```
+
+
+If you are unable to use the previous urls you can download the weights from [Google Drive](https://drive.google.com/drive/folders/19bNOs8_rZ7LmPP3boDS3XvZcR1iryHR1?usp=sharing).
+
+
+
 ### STEP 1: Size-Invariant TimeSformer Training
 In this phase, only one identity per video (the one with the largest size) is considered.
 The network is trained to perform pristine/fake binary classification and the multi-face case is ignored at this stage. The features are extracted from a pertrained EfficientNet B0 and the training of the TimeSformer is also influenced by the presence of an additional embedding, namely the size embedding. It is calculated from the face-frame area ratio for each face of the video and concatenated to each token obtained from it. 
@@ -294,6 +309,16 @@ The following parameters can be changed as desired to perform different training
 - --patience: How many epochs wait before stopping for validation loss not improving (default: 5);
 - --logger_name: Path to the folder for tensorboard logging (default: runs/train);
 
+
+### STEP 2: Identity Network Training
+The Size Invariant TimeSformer trained in the previous step is then used as a feature extractor to train an Identity Network that will perform classification based on the features extracted from all identities in the video. This further step is necessary to exploit multi-faces videos effectively.
+
+![Identity Network](images/identity_network.gif)
+
+To run the step 1 of the training process use the following commands:
+```
+python3 train.py --config config/identity_network.yaml --model 2 --train_list_file path/to/training_list_file.txt --validation_list_file path/to/validation_list_file.txt --extractor_weights path/to/backbone_weights
+```
+
 ## Evaluation
-
-
+TODO

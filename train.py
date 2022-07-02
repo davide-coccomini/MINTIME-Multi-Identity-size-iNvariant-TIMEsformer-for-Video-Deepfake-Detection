@@ -116,10 +116,12 @@ if __name__ == "__main__":
         model = model.to(opt.gpu_id)
 
     model.train()
+    
     if opt.freeze_backbone:
         optimizer = torch.optim.SGD(model.parameters(), lr=config['training']['lr'], weight_decay=config['training']['weight-decay'], momentum=config['training']['momentum'])
     else:
         optimizer = torch.optim.SGD(chain(features_extractor.parameters(), model.parameters()), lr=config['training']['lr'], weight_decay=config['training']['weight-decay'], momentum=config['training']['momentum'])
+    
     scheduler = lr_scheduler.StepLR(optimizer, step_size=config['training']['step-size'], gamma=config['training']['gamma'])
     starting_epoch = 0
     if os.path.exists(opt.resume):

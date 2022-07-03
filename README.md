@@ -2,11 +2,11 @@
 
 ## Motivations behind this study
 The continuing advancement of deepfake generation techniques and the increasingly credible results obtained through these, makes it increasingly urgent to develop new techniques to distinguish a manipulated video from a real one. This is, however, a far from simple task that introduces multiple challenges to be overcome, challenges that form the basis of this research work. 
-- Generalization of the Deepfake concept:  Deepfake generation methods tend to introduce specific anomalies within images and videos. Deepfake detection models often tend to learn to recognise these specific anomalies and are therefore ineffective in the real world when dealing with unseen manipulations. Our previous studies in this area suggest a greater capacity for generalisation by Vision Transformers than by Convolutional Neural Networks [<a href="https://arxiv.org/abs/2107.02612">Coccomini et al, 2022</a>];
-- Ability to pick up both spatial and temporal anomalies within a video: Very often the anomalies that are searched for by deepfake detectors are exclusively spatial with frame-by-frame classifications. However, some important anomalies lie precisely in the variation of the face over time, which can be unnatural and thus allow a manipulated video to be identified;
-- Scalability of models: In order to carry out an effective Deepfake Detection, one often tends to exploit large deep learning models or even ensemble techniques involving significant inference and training times; 
-- Handling of multiple faces within the same video: A specific situation that can be exploited by an attacker to deceive a deepfake detection system is found in the case of videos or images with multiple faces (identities). An attacker could in fact decide to manipulate only one of the people in the video. However, if the detection is carried out en bloc for all the faces in the video, the negative contribution to the final prediction made by the fake faces could be 'masked' by the non-manipulated ones, thus deceiving the system.
-- Management of different face-frame area ratios: Typically in deepfake detection systems, the person's face is extracted from the video or image to be classified and before being given as input to a neural model it is rescaled to be uniform with all the others. This results in an important loss of information, namely the ratio of the area of the subject's face to the rest of the scene.
+- <b>Generalization of the Deepfake concept</b>:  Deepfake generation methods tend to introduce specific anomalies within images and videos. Deepfake detection models often tend to learn to recognise these specific anomalies and are therefore ineffective in the real world when dealing with unseen manipulations. Our previous studies in this area suggest a greater capacity for generalisation by Vision Transformers than by Convolutional Neural Networks [<a href="https://arxiv.org/abs/2206.13829">Coccomini et al, 2022</a>];
+- <b>Ability to pick up both spatial and temporal anomalies within a video</b>: Very often the anomalies that are searched for by deepfake detectors are exclusively spatial with frame-by-frame classifications. However, some important anomalies lie precisely in the variation of the face over time, which can be unnatural and thus allow a manipulated video to be identified;
+- <b>Scalability of models</b>: In order to carry out an effective Deepfake Detection, one often tends to exploit large deep learning models or even ensemble techniques involving significant inference and training times; 
+- <b>Handling of multiple faces within the same video</b>: A specific situation that can be exploited by an attacker to deceive a deepfake detection system is found in the case of videos or images with multiple faces (identities). An attacker could in fact decide to manipulate only one of the people in the video. However, if the detection is carried out en bloc for all the faces in the video, the negative contribution to the final prediction made by the fake faces could be 'masked' by the non-manipulated ones, thus deceiving the system.
+- <b>Management of different face-frame area ratios</b>: Typically in deepfake detection systems, the person's face is extracted from the video or image to be classified and before being given as input to a neural model it is rescaled to be uniform with all the others. This results in an important loss of information, namely the ratio of the area of the subject's face to the rest of the scene.
 
 To solve all these problems, we propose a Size-Invariant Multi-Identity Transformer-based architecture that exploits Divided Space-Time attention. 
 The special features of our proposal are as follows:
@@ -196,7 +196,7 @@ The dataset at the end of this process will have the following structure:
 
 Having to manage multi-face videos and wanting to detect temporal and not just spatial anomalies, it is necessary to clustered the faces in each video on the basis of their similarity and maintaining the temporal order of their appearance in the frames. To do this, a clustering algorithm was developed that groups the faces extracted from the videos into sequences. 
 
-To run the clustering split run the following commands:
+To run the clustering split use the following commands:
 ```
 cd preprocessing
 python3 cluster_faces.py --faces_path path/to/faces
@@ -272,7 +272,6 @@ The training phase is divided into two distinct phases. A first phase designed t
 In the second step, an Identity Network is trained to perform the final classification for all identities of the same video from the features extracted by the model obtained in the previous step.
 
 To download the pretrained weights of the models you can run the following commands:
-(Efficient ViT)
 ```
 mkdir weights
 cd weights
@@ -322,3 +321,10 @@ python3 train.py --config config/identity_network.yaml --model 2 --train_list_fi
 
 ## Evaluation
 TODO
+
+
+## Additional Parameters
+In all the script the following parameters can be also customized:
+
+- --gpu_id: ID of GPU to use for processing
+- --workers: Number of workers to use for processing

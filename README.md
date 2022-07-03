@@ -299,7 +299,6 @@ python3 train.py --config config/size_invariant_timesformer.yaml --model 1 --tra
 
 The following parameters can be changed as desired to perform different training:
 - --num_epochs: Number of training epochs (default: 300);
-- --workers: Number of data loader workers (default: 10);
 - --resume: Path to latest checkpoint (default: none);
 - --random_state: Random state number for reproducibility (default: 42)
 - --freeze_backbone: Maintain the network freezed or train it (default: False);
@@ -324,7 +323,7 @@ TODO
 
 
 ## Additional Parameters
-In all the script the following parameters can be also customized:
+In all the scripts the following parameters can be also customized:
 
-- --gpu_id: ID of GPU to use for processing
-- --workers: Number of workers to use for processing
+- --gpu_id: ID of GPU to use for processing (default: 0);
+- --workers: Number of data loader workers (default: 8);

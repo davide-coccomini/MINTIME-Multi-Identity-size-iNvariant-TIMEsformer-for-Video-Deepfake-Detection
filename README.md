@@ -293,13 +293,10 @@ The network is trained to perform pristine/fake binary classification and the mu
 
 ![Size Invariant TimeSformer](images/size_invariant_timesformer.gif)
 
-The number of frames per video, and thus consecutive faces to be considered for classification, is set via the num-frames parameter in the configuration file. In the event that there are fewer faces in the considered identity than necessary, more empty ones are added and then a mask is used to drive the calculation of attention properly.
+The number of frames per video, and thus consecutive faces to be considered for classification, is set via the num-frames parameter in the configuration file. In the event that there are fewer faces in the considered identity than necessary, more empty ones are added and then a mask is used to drive the calculation of attention properly. In the case of longer sequences, however, uniform sampling is performed.
 
-![Mask Generation](images/masking.png)
-
- In the case of longer sequences, however, uniform sampling is performed.
+![Mask Generation and Sequence Sampling](images/masking.png)
  
-![Sequence sampling](images/sequence_sampling.png)
 
 To run the step 1 of the training process use the following commands:
 ```

@@ -1,5 +1,6 @@
 # Size Invariant Multi-Identity Transformer-based Architecture for Video Deepfake Detection using Space-Time Attention
 
+![Header](images/faces.png)
 ## Motivations behind this study
 The continuing advancement of deepfake generation techniques and the increasingly credible results obtained through these, makes it increasingly urgent to develop new techniques to distinguish a manipulated video from a real one. This is, however, a far from simple task that introduces multiple challenges to be overcome, challenges that form the basis of this research work. 
 - <b>Generalization of the Deepfake concept</b>:  Deepfake generation methods tend to introduce specific anomalies within images and videos. Deepfake detection models often tend to learn to recognise these specific anomalies and are therefore ineffective in the real world when dealing with unseen manipulations. Our previous studies in this area suggest a greater capacity for generalisation by Vision Transformers than by Convolutional Neural Networks [<a href="https://arxiv.org/abs/2206.13829">Coccomini et al, 2022</a>];
@@ -291,6 +292,14 @@ The network is trained to perform pristine/fake binary classification and the mu
 
 
 ![Size Invariant TimeSformer](images/size_invariant_timesformer.gif)
+
+The number of frames per video, and thus consecutive faces to be considered for classification, is set via the num-frames parameter in the configuration file. In the event that there are fewer faces in the considered identity than necessary, more empty ones are added and then a mask is used to drive the calculation of attention properly.
+
+![Mask Generation](images/masking.png)
+
+ In the case of longer sequences, however, uniform sampling is performed.
+ 
+![Sequence sampling](images/sequence_sampling.png)
 
 To run the step 1 of the training process use the following commands:
 ```

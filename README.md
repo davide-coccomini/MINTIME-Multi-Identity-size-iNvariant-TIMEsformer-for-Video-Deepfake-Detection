@@ -31,7 +31,7 @@ From an analysis conducted during our research, we identified the presence of 11
 
 ![ForgeryNet face/frame ratio distribution](images/forgery_net_ratios.png)
 
-Furthermore, the EfficientNet B0 used as a patch extraction backbone was trained in a previous research work on the DFDC and FaceForensics++ datasets.
+Furthermore, the EfficientNet B0 used as a patch extraction backbone was trained in <a href="https://arxiv.org/abs/2107.02612">our previous research work</a> on the DFDC and FaceForensics++ datasets.
 
 The datasets can be downloaded at the following links:
 - ForgeryNet: https://yinanhe.github.io/projects/forgerynet.html#download
@@ -327,3 +327,7 @@ In all the scripts the following parameters can be also customized:
 
 - --gpu_id: ID of GPU to use for processing (default: 0);
 - --workers: Number of data loader workers (default: 8);
+
+
+# Reference
+TODO

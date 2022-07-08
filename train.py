@@ -121,19 +121,25 @@ if __name__ == "__main__":
     model = model.to(opt.gpu_id)
         
     model.train()
-    if config['training']['optimizer'] == 'SGD':
-        if opt.freeze_backbone:
-            optimizer = torch.optim.SGD(model.parameters(), lr=config['training']['lr'], weight_decay=config['training']['weight-decay'])
-        else:
-            optimizer = torch.optim.SGD(chain(features_extractor.parameters(), model.parameters()), lr=config['training']['lr'], weight_decay=config['training']['weight-decay'])
-   
-        scheduler = lr_scheduler.StepLR(optimizer, step_size=config['training']['step-size'], gamma=config['training']['gamma'])
+
+    if opt.freeze_backbone:
+        parameters = model.parameters()
     else:
-        if opt.freeze_backbone:
-            optimizer = torch.optim.AdamW(model.parameters(), lr=config['training']['lr'])
-        else:
-            optimizer = torch.optim.AdamW(chain(features_extractor.parameters(), model.parameters()), lr=config['training']['lr'])
-        
+        parameters = chain(features_extractor.parameters(), model.parameters())
+
+    if config['training']['optimizer'].lower() == 'sgd':
+        optimizer = torch.optim.SGD(parameters, lr=config['training']['lr'], weight_decay=config['training']['weight-decay'])
+    elif config['training']['optimizer'].lower() == 'adamw':
+        optimizer = torch.optim.AdamW(parameters, lr=config['training']['lr'], weight_decay=config['training']['weight-decay'])
+    elif config['training']['optimizer'].lower() == 'adam':
+        optimizer = torch.optim.Adam(parameters, lr=config['training']['lr'], weight_decay=config['training']['weight-decay'])
+    else:
+        print("Error: Invalid optimizer specified in the config file.")
+        exit()
+
+    if config['training']['scheduler'].lower() == 'steplr':   
+        scheduler = lr_scheduler.StepLR(optimizer, step_size=config['training']['step-size'], gamma=config['training']['gamma'])
+    elif config['training']['scheduler'].lower() == 'cosinelr':
         lr_scheduler = CosineLRScheduler(
                 optimizer,
                 t_initial=opt.num_epochs,
@@ -141,6 +147,9 @@ if __name__ == "__main__":
                 cycle_limit=1,
                 t_in_epochs=False,
         )
+    else:
+        print("Warning: Invalid scheduler specified in the config file.")
+
 
     starting_epoch = 0
     if os.path.exists(opt.resume):
@@ -274,14 +283,14 @@ if __name__ == "__main__":
             counter += 1
             total_loss += round(loss.item(), 2)
             
-            if config['training']['optimizer'] != 'SGD':
+            if config['training']['scheduler'].lower() == 'cosinelr':
                 lr_scheduler.step_update((t * (train_batches) + index))
 
             time_diff = datetime.now()-start_time
             duration = float(str(time_diff.seconds) + "." +str(time_diff.microseconds))
             times_per_batch += duration
             if index%100 == 0: # Intermediate metrics print
-                expected_time = str(timedelta(seconds=(times_per_batch / (index+1))*total_batches))
+                expected_time = str(timedelta(seconds=(times_per_batch / (index+1))*total_batches-index))
                 print("\nLoss: ", total_loss/counter, "Accuracy: ", train_correct/(counter*config['training']['bs']) ,"Train 0s: ", negative, "Train 1s:", positive, "Expected Time:", expected_time)
 
 
@@ -315,12 +324,12 @@ if __name__ == "__main__":
                 val_negative += negative_class
                 bar.next()
         
+        if config['training']['scheduler'].lower() == 'steplr':
+            scheduler.step()
+
         torch.cuda.empty_cache() 
 
         
-        if config['training']['optimizer'] == 'SGD':
-            scheduler.step()
-
 
         bar.finish()
             

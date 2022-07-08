@@ -4,10 +4,9 @@ training:
   bs: 48
   val_bs: 48
   optimizer: 'AdamW'
-  scheduler: 'steplr'
+  scheduler: 'cosinelr' 
   gamma: 0.1
   step-size: 15
-  momentum: 0.9
 
 
 model:

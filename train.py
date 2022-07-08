@@ -236,7 +236,7 @@ if __name__ == "__main__":
         train_correct = 0
         positive = 0
         negative = 0
-        times_per_batch = []
+        times_per_batch = 0
         train_batches = len(train_dl)
         val_batches = len(val_dl)
         total_batches = train_batches + val_batches
@@ -277,10 +277,13 @@ if __name__ == "__main__":
             total_loss += round(loss.item(), 2)
             
             lr_scheduler.step_update((t * (train_batches) + index))
-            times_per_batch.append(round((datetime.now()-start_time).seconds))
+            time_diff = datetime.now()-start_time
+            duration = float(str(time_diff.seconds) + "." +str(time_diff.microseconds))
+            times_per_batch += duration
             
-            if index%500 == 0: # Intermediate metrics print
-                expected_time = str(timedelta(seconds=((mean(times_per_batch))*total_batches-index)))
+            if index%1 == 0: # Intermediate metrics print
+                expected_time = str(timedelta(seconds=(times_per_batch / (index+1))*total_batches))
+                print(expected_time)
                 print("\nLoss: ", total_loss/counter, "Accuracy: ", train_correct/(counter*config['training']['bs']) ,"Train 0s: ", negative, "Train 1s:", positive, "Expected Time:", expected_time)
 
 

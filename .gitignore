@@ -4,7 +4,6 @@
 outputs
 preprocessing/data_preparation.py
 preprocessing/get_sizes_ranges.py
-config/baseline.yaml
 __pycache__
 timesformer.py
 runs

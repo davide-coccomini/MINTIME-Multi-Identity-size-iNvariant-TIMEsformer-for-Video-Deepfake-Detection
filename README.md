@@ -319,7 +319,7 @@ The Size Invariant TimeSformer trained in the previous step is then used as a fe
 
 ![Identity Network](images/identity_network.gif)
 
-To run the step 1 of the training process use the following commands:
+To run the step 2 of the training process use the following commands:
 ```
 python3 train.py --config config/identity_network.yaml --model 2 --train_list_file path/to/training_list_file.txt --validation_list_file path/to/validation_list_file.txt --extractor_weights path/to/backbone_weights
 ```

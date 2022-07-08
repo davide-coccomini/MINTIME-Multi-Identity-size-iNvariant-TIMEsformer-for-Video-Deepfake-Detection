@@ -160,6 +160,7 @@ class SizeInvariantTimeSformer(nn.Module):
         self.attn_dropout = config['model']['attn-dropout']
         self.ff_dropout = config['model']['ff-dropout']
         self.shift_tokens = config['model']['shift-tokens']
+        self.enable_size_emb = config['model']['enable-size-emb']
 
 
         num_positions = self.num_frames * self.channels
@@ -167,7 +168,8 @@ class SizeInvariantTimeSformer(nn.Module):
         self.cls_token = nn.Parameter(torch.randn(1, self.dim))
      
         self.pos_emb = nn.Embedding(num_positions + 1, self.dim)
-        self.size_emb = nn.Embedding(num_positions + 1, self.dim)
+        if self.enable_size_emb:
+            self.size_emb = nn.Embedding(num_positions + 1, self.dim)
 
 
         self.layers = nn.ModuleList([])
@@ -190,7 +192,8 @@ class SizeInvariantTimeSformer(nn.Module):
         # Initialization
         trunc_normal_(self.pos_emb.weight, std=.02)
         trunc_normal_(self.cls_token, std=.02)
-        trunc_normal_(self.size_emb.weight, std=.02)
+        if self.enable_size_emb:
+            trunc_normal_(self.size_emb.weight, std=.02)
         self.apply(self._init_weights)
 
     def _init_weights(self, m):
@@ -204,7 +207,11 @@ class SizeInvariantTimeSformer(nn.Module):
 
     @torch.jit.ignore
     def no_weight_decay(self):
-        return {'pos_emb', 'cls_token', 'size_emb'}
+        if self.enable_size_emb:
+            return {'pos_emb', 'cls_token', 'size_emb'}
+        else:
+            return {'pos_emb', 'cls_token'}
+
 
     def forward(self, x, mask = None, size_embedding = None):
         b, f, c, h, w, *_, device = *x.shape, x.device
@@ -220,12 +227,13 @@ class SizeInvariantTimeSformer(nn.Module):
         x += self.pos_emb(torch.arange(x.shape[1], device = device))
         
         # size embedding
-        size_embedding = repeat(size_embedding, 'b f -> b f p', p=self.num_patches)      # B x 8 x 49   
-        size_embedding = rearrange(size_embedding, 'b f p -> b (f p)')
-        cls_token = torch.Tensor([0]*b).unsqueeze(-1)
-        size_embedding = torch.cat((cls_token, size_embedding), dim = 1)
-        size_embedding = size_embedding.to(device).int()
-        x += self.size_emb(size_embedding)
+        if self.enable_size_emb:
+            size_embedding = repeat(size_embedding, 'b f -> b f p', p=self.num_patches)      # B x 8 x 49   
+            size_embedding = rearrange(size_embedding, 'b f p -> b (f p)')
+            cls_token = torch.Tensor([0]*b).unsqueeze(-1)
+            size_embedding = torch.cat((cls_token, size_embedding), dim = 1)
+            size_embedding = size_embedding.to(device).int()
+            x += self.size_emb(size_embedding)
         
         # calculate masking for uneven number of frames
         frame_mask = None

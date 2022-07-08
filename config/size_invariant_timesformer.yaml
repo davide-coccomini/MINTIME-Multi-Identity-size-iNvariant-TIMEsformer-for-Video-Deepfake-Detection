@@ -15,7 +15,7 @@ model:
   num-classes: 1
   num-patches: 49
   num-frames: 8
-  dim: 512
+  dim: 256
   depth: 4
   dim-head: 64
   channels: 1280
@@ -24,3 +24,4 @@ model:
   attn-dropout: 0.
   ff-dropout: 0.
   shift-tokens: False
+  enable-size-emb: True

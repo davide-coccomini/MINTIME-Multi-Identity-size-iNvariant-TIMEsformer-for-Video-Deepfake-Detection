@@ -57,7 +57,7 @@ if __name__ == "__main__":
                         help='Number of data loader workers.')
     parser.add_argument('--random_state', default=42, type=int,
                         help='Random state value')
-    parser.add_argument('--freeze_backbone', default=False, type=bool,
+    parser.add_argument('--freeze_backbone', default=False, action="store_true",
                         help='Maintain the backbone freezed or train it.')
     parser.add_argument('--extractor_unfreeze_blocks', type=int, default=-1, 
                         help="How many layers unfreeze in the extractor.")
@@ -86,22 +86,21 @@ if __name__ == "__main__":
         config = yaml.safe_load(ymlfile)
 
     torch.cuda.set_device(opt.gpu_id) 
-
+    
     torch.backends.cudnn.deterministic = True
     random.seed(opt.random_state)
     torch.manual_seed(opt.random_state)
     torch.cuda.manual_seed(opt.random_state)
     np.random.seed(opt.random_state)
-
-    os.makedirs(opt.logger_name, exist_ok=True)
    
+    os.makedirs(opt.logger_name, exist_ok=True)
     if opt.extractor_weights.lower() == 'imagenet':
         features_extractor = EfficientNet.from_pretrained('efficientnet-b0')
     else:
         features_extractor = EfficientNet.from_name('efficientnet-b0')
-        features_extractor.load_matching_state_dict(torch.load(opt.extractor_weights))
+        features_extractor.load_matching_state_dict(torch.load(opt.extractor_weights, map_location=torch.device('cpu')))
         print("Custom features extractor weights loaded.")
-
+    
     if opt.model == 0:
         model = Baseline()
     else:
@@ -118,31 +117,30 @@ if __name__ == "__main__":
                         param.requires_grad = True
                     else:
                         param.requires_grad = False
-            
-    features_extractor = features_extractor.to(opt.gpu_id)
+    features_extractor = features_extractor.to(opt.gpu_id)    
     model = model.to(opt.gpu_id)
         
     model.train()
-    '''
-    if opt.freeze_backbone:
-        optimizer = torch.optim.SGD(model.parameters(), lr=config['training']['lr'], weight_decay=config['training']['weight-decay'])
+    if config['training']['optimizer'] == 'SGD':
+        if opt.freeze_backbone:
+            optimizer = torch.optim.SGD(model.parameters(), lr=config['training']['lr'], weight_decay=config['training']['weight-decay'])
+        else:
+            optimizer = torch.optim.SGD(chain(features_extractor.parameters(), model.parameters()), lr=config['training']['lr'], weight_decay=config['training']['weight-decay'])
+   
+        scheduler = lr_scheduler.StepLR(optimizer, step_size=config['training']['step-size'], gamma=config['training']['gamma'])
     else:
-        optimizer = torch.optim.SGD(chain(features_extractor.parameters(), model.parameters()), lr=config['training']['lr'], weight_decay=config['training']['weight-decay'])
-    
-    scheduler = lr_scheduler.StepLR(optimizer, step_size=config['training']['step-size'], gamma=config['training']['gamma'])
-    '''
-    if opt.freeze_backbone:
-        optimizer = torch.optim.AdamW(model.parameters(), lr=config['training']['lr'])
-    else:
-        optimizer = torch.optim.AdamW(chain(features_extractor.parameters(), model.parameters()), lr=config['training']['lr'])
-     
-    lr_scheduler = CosineLRScheduler(
-            optimizer,
-            t_initial=opt.num_epochs,
-            lr_min=config['training']['lr'] * 1e-2,
-            cycle_limit=1,
-            t_in_epochs=False,
-    )
+        if opt.freeze_backbone:
+            optimizer = torch.optim.AdamW(model.parameters(), lr=config['training']['lr'])
+        else:
+            optimizer = torch.optim.AdamW(chain(features_extractor.parameters(), model.parameters()), lr=config['training']['lr'])
+        
+        lr_scheduler = CosineLRScheduler(
+                optimizer,
+                t_initial=opt.num_epochs,
+                lr_min=config['training']['lr'] * 1e-2,
+                cycle_limit=1,
+                t_in_epochs=False,
+        )
 
     starting_epoch = 0
     if os.path.exists(opt.resume):
@@ -232,7 +230,7 @@ if __name__ == "__main__":
         total_loss = 0
         total_val_loss = 0
         
-        bar = ChargingBar('EPOCH #' + str(t), max=(len(train_dl)*config['training']['bs'])+len(val_dl))
+        bar = ChargingBar('EPOCH #' + str(t), max=(len(train_dl)+len(val_dl)))
         train_correct = 0
         positive = 0
         negative = 0
@@ -276,47 +274,35 @@ if __name__ == "__main__":
             counter += 1
             total_loss += round(loss.item(), 2)
             
-            lr_scheduler.step_update((t * (train_batches) + index))
+            if config['training']['optimizer'] != 'SGD':
+                lr_scheduler.step_update((t * (train_batches) + index))
+
             time_diff = datetime.now()-start_time
             duration = float(str(time_diff.seconds) + "." +str(time_diff.microseconds))
             times_per_batch += duration
-            
-            if index%1 == 0: # Intermediate metrics print
+            if index%100 == 0: # Intermediate metrics print
                 expected_time = str(timedelta(seconds=(times_per_batch / (index+1))*total_batches))
-                print(expected_time)
                 print("\nLoss: ", total_loss/counter, "Accuracy: ", train_correct/(counter*config['training']['bs']) ,"Train 0s: ", negative, "Train 1s:", positive, "Expected Time:", expected_time)
 
 
-            for i in range(config['training']['bs']):
-                bar.next()
-        
+            bar.next()
         torch.cuda.empty_cache() 
-        
         val_correct = 0
         val_positive = 0
         val_negative = 0
         val_counter = 0
         train_correct /= train_samples
         total_loss /= counter
-        
         model.eval()
         for index, (videos, size_embeddings, masks, labels) in enumerate(val_dl):
             b, f, _, _, _= videos.shape
             videos = videos.to(opt.gpu_id)
             masks = masks.to(opt.gpu_id)
             labels = labels.unsqueeze(1).float()
-
             with torch.no_grad():
-                if opt.freeze_backbone:
-                    features_extractor = features_extractor.to(opt.gpu_id)
-
                 videos = rearrange(videos, 'b f h w c -> (b f) c h w')                                       # B*8 x 3 x 224 x 224
                 features = features_extractor.extract_features(videos)                                           # B*8 x 1280 x 7 x 7
                 features = rearrange(features, '(b f) c h w -> b f c h w', b = b, f = f)   
-                
-                if opt.freeze_backbone:
-                    model = model.to(opt.gpu_id)
-
                 val_pred = model(features, mask=masks, size_embedding=size_embeddings)
                 videos = videos.cpu()
                 val_pred = val_pred.cpu()
@@ -331,8 +317,9 @@ if __name__ == "__main__":
         
         torch.cuda.empty_cache() 
 
-    
-        #scheduler.step()
+        
+        if config['training']['optimizer'] == 'SGD':
+            scheduler.step()
 
 
         bar.finish()

@@ -1,8 +1,9 @@
 training:
   lr: 1.0e-4
   weight-decay: 0.0001
-  bs: 8
-  val_bs: 8
+  bs: 48
+  val_bs: 48
+  optimizer: 'AdamW'
   scheduler: 'steplr'
   gamma: 0.1
   step-size: 15
@@ -15,8 +16,8 @@ model:
   num-classes: 1
   num-patches: 49
   num-frames: 8
-  dim: 256
-  depth: 4 
+  dim: 512
+  depth: 4
   dim-head: 64
   channels: 1280
   heads: 8

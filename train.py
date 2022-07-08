@@ -15,7 +15,7 @@ import os
 import json
 from itertools import chain
 import random
-from einops import rearrange
+from einops import rearrange, reduce
 import pandas as pd
 from os import cpu_count
 from multiprocessing.pool import Pool
@@ -29,6 +29,7 @@ from models.efficientnet.efficientnet_pytorch import EfficientNet
 from torch.utils.tensorboard import SummaryWriter
 import torch_optimizer as optim
 from timm.scheduler.cosine_lr import CosineLRScheduler
+from models.baseline import Baseline
 
 
 
@@ -94,6 +95,8 @@ if __name__ == "__main__":
     np.random.seed(opt.random_state)
    
     os.makedirs(opt.logger_name, exist_ok=True)
+    os.makedirs(opt.models_output_path, exist_ok=True)
+
     if opt.extractor_weights.lower() == 'imagenet':
         features_extractor = EfficientNet.from_pretrained('efficientnet-b0')
     else:
@@ -102,7 +105,7 @@ if __name__ == "__main__":
         print("Custom features extractor weights loaded.")
     
     if opt.model == 0:
-        model = Baseline()
+        model = Baseline(config=config)
     else:
         model = SizeInvariantTimeSformer(config=config)
 
@@ -249,23 +252,26 @@ if __name__ == "__main__":
         total_batches = train_batches + val_batches
         for index, (videos, size_embeddings, masks, labels) in enumerate(train_dl):
             start_time = datetime.now()
-            b, f, _, _, _= videos.shape
+            b, f, h, w, c = videos.shape
             labels = labels.unsqueeze(1).float()
             videos = videos.to(opt.gpu_id)
             masks = masks.to(opt.gpu_id)
-            
-            videos = rearrange(videos, 'b f h w c -> (b f) c h w')                                               # B*8 x 3 x 224 x 224
-            if opt.freeze_backbone:
-                with torch.no_grad():
+            if opt.model == 0: 
+                videos = reduce(videos, "b f h w c -> b h w c", 'mean')
+                videos = rearrange(videos, "b h w c -> b c h w")
+                features = features_extractor.extract_features(videos)  
+                y_pred = model(features)
+            elif opt.model == 1: 
+                videos = rearrange(videos, 'b f h w c -> (b f) c h w')                                               # B*8 x 3 x 224 x 224
+                if opt.freeze_backbone:
+                    with torch.no_grad():
+                        features = features_extractor.extract_features(videos)                                               # B*8 x 1280 x 7 x 7
+                else:
                     features = features_extractor.extract_features(videos)                                               # B*8 x 1280 x 7 x 7
-            else:
-                features = features_extractor.extract_features(videos)                                               # B*8 x 1280 x 7 x 7
-               
-            
-            features = rearrange(features, '(b f) c h w -> b f c h w', b = b, f = f)
-            
-            y_pred = model(features, mask=masks, size_embedding=size_embeddings)
-     
+    
+                features = rearrange(features, '(b f) c h w -> b f c h w', b = b, f = f)
+                y_pred = model(features, mask=masks, size_embedding=size_embeddings)
+        
 
             videos = videos.cpu()
             y_pred = y_pred.cpu()
@@ -342,23 +348,25 @@ if __name__ == "__main__":
         else:
             not_improved_loss = 0
         
+        
+        if previous_loss > total_val_loss:
+            torch.save(features_extractor.state_dict(), os.path.join(opt.models_output_path,  "EfficientNetExtractor_checkpoint" + str(t)))
+            torch.save(model.state_dict(), os.path.join(opt.models_output_path,  "SizeInvariantTimeSformer_checkpoint" + str(t)))
 
+
+   
         tb_logger.add_scalar("Training/Accuracy", train_correct, t)
         tb_logger.add_scalar("Training/Loss", total_loss, t)
         tb_logger.add_scalar("Training/Learning_Rate", optimizer.param_groups[0]['lr'], t)
-        tb_logger.add_scalar("Validation/Loss", total_loss, t)
+        tb_logger.add_scalar("Validation/Loss", total_val_loss, t)
         tb_logger.add_scalar("Validation/Accuracy", val_correct, t)
+
 
         previous_loss = total_val_loss
             
         print("#" + str(t) + "/" + str(opt.num_epochs) + " loss:" +
             str(total_loss) + " accuracy:" + str(train_correct) +" val_loss:" + str(total_val_loss) + " val_accuracy:" + str(val_correct) + " val_0s:" + str(val_negative) + "/" + str(val_counters[0]) + " val_1s:" + str(val_positive) + "/" + str(val_counters[1]))
     
-        if not os.path.exists(opt.models_output_path):
-            os.makedirs(opt.models_output_path)
         
         
-        if previous_loss > total_val_loss:
-            torch.save(features_extractor.state_dict(), os.path.join(opt.models_output_path,  "EfficientNetExtractor_checkpoint" + str(t)))
-            torch.save(model.state_dict(), os.path.join(opt.models_output_path,  "SizeInvariantTimeSformer_checkpoint" + str(t)))
         

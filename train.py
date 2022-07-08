@@ -7,6 +7,8 @@ import yaml
 from utils import get_n_params, check_correct
 from sklearn.utils.class_weight import compute_class_weight 
 from torch.optim.lr_scheduler import LambdaLR
+from datetime import datetime, timedelta
+from statistics import mean
 import tensorflow as tf
 import collections
 import os
@@ -26,6 +28,8 @@ from models.size_invariant_timesformer import SizeInvariantTimeSformer
 from models.efficientnet.efficientnet_pytorch import EfficientNet
 from torch.utils.tensorboard import SummaryWriter
 import torch_optimizer as optim
+from timm.scheduler.cosine_lr import CosineLRScheduler
+
 
 
 
@@ -34,7 +38,7 @@ DATA_DIR = os.path.join(BASE_DIR, "datasets/ForgeryNet/faces")
 TRAINING_DIR = os.path.join(DATA_DIR, "train")
 VALIDATION_DIR = os.path.join(DATA_DIR, "val")
 TEST_DIR = os.path.join(DATA_DIR, "test")
-MODELS_PATH = "outputs/models"
+
 
 
 
@@ -73,21 +77,24 @@ if __name__ == "__main__":
                         help="How many epochs wait before stopping for validation loss not improving.")
     parser.add_argument('--logger_name', default='runs/train',
                         help='Path to save the model and Tensorboard log.')
+    parser.add_argument('--models_output_path', default='"outputs/models"',
+                        help='Output path for checkpoints.')
     opt = parser.parse_args()
     
     print(opt)
     with open(opt.config, 'r') as ymlfile:
         config = yaml.safe_load(ymlfile)
 
-
     torch.cuda.set_device(opt.gpu_id) 
-    '''
+
     torch.backends.cudnn.deterministic = True
     random.seed(opt.random_state)
     torch.manual_seed(opt.random_state)
     torch.cuda.manual_seed(opt.random_state)
     np.random.seed(opt.random_state)
-    '''
+
+    os.makedirs(opt.logger_name, exist_ok=True)
+   
     if opt.extractor_weights.lower() == 'imagenet':
         features_extractor = EfficientNet.from_pretrained('efficientnet-b0')
     else:
@@ -112,17 +119,31 @@ if __name__ == "__main__":
                     else:
                         param.requires_grad = False
             
-        features_extractor = features_extractor.to(opt.gpu_id)
-        model = model.to(opt.gpu_id)
-
+    features_extractor = features_extractor.to(opt.gpu_id)
+    model = model.to(opt.gpu_id)
+        
     model.train()
-    
+    '''
     if opt.freeze_backbone:
-        optimizer = torch.optim.SGD(model.parameters(), lr=config['training']['lr'], weight_decay=config['training']['weight-decay'], momentum=config['training']['momentum'])
+        optimizer = torch.optim.SGD(model.parameters(), lr=config['training']['lr'], weight_decay=config['training']['weight-decay'])
     else:
-        optimizer = torch.optim.SGD(chain(features_extractor.parameters(), model.parameters()), lr=config['training']['lr'], weight_decay=config['training']['weight-decay'], momentum=config['training']['momentum'])
+        optimizer = torch.optim.SGD(chain(features_extractor.parameters(), model.parameters()), lr=config['training']['lr'], weight_decay=config['training']['weight-decay'])
     
     scheduler = lr_scheduler.StepLR(optimizer, step_size=config['training']['step-size'], gamma=config['training']['gamma'])
+    '''
+    if opt.freeze_backbone:
+        optimizer = torch.optim.AdamW(model.parameters(), lr=config['training']['lr'])
+    else:
+        optimizer = torch.optim.AdamW(chain(features_extractor.parameters(), model.parameters()), lr=config['training']['lr'])
+     
+    lr_scheduler = CosineLRScheduler(
+            optimizer,
+            t_initial=opt.num_epochs,
+            lr_min=config['training']['lr'] * 1e-2,
+            cycle_limit=1,
+            t_in_epochs=False,
+    )
+
     starting_epoch = 0
     if os.path.exists(opt.resume):
         model.load_state_dict(torch.load(opt.resume))
@@ -215,27 +236,29 @@ if __name__ == "__main__":
         train_correct = 0
         positive = 0
         negative = 0
+        times_per_batch = []
+        train_batches = len(train_dl)
+        val_batches = len(val_dl)
+        total_batches = train_batches + val_batches
         for index, (videos, size_embeddings, masks, labels) in enumerate(train_dl):
+            start_time = datetime.now()
             b, f, _, _, _= videos.shape
             labels = labels.unsqueeze(1).float()
             videos = videos.to(opt.gpu_id)
             masks = masks.to(opt.gpu_id)
+            
+            videos = rearrange(videos, 'b f h w c -> (b f) c h w')                                               # B*8 x 3 x 224 x 224
             if opt.freeze_backbone:
                 with torch.no_grad():
-                    model = model.cpu()
-                    features_extractor = features_extractor.to(opt.gpu_id)
-                    videos = rearrange(videos, 'b f h w c -> (b f) c h w')                                               # B*8 x 3 x 224 x 224
                     features = features_extractor.extract_features(videos)                                               # B*8 x 1280 x 7 x 7
-                    features = rearrange(features, '(b f) c h w -> b f c h w', b = b, f = f)                             # B x 8 x 1280 x 7 x 7
-                    features_extractor = features_extractor.cpu()
-                    model = model.to(opt.gpu_id)
             else:
-                videos = rearrange(videos, 'b f h w c -> (b f) c h w')                                               # B*8 x 3 x 224 x 224
                 features = features_extractor.extract_features(videos)                                               # B*8 x 1280 x 7 x 7
-                features = rearrange(features, '(b f) c h w -> b f c h w', b = b, f = f)                             # B x 8 x 1280 x 7 x 7
+               
+            
+            features = rearrange(features, '(b f) c h w -> b f c h w', b = b, f = f)
             
             y_pred = model(features, mask=masks, size_embedding=size_embeddings)
-         
+     
 
             videos = videos.cpu()
             y_pred = y_pred.cpu()
@@ -245,14 +268,20 @@ if __name__ == "__main__":
             positive += positive_class
             negative += negative_class
             optimizer.zero_grad()
-            
+       
             loss.backward()
+
             optimizer.step()
+
             counter += 1
             total_loss += round(loss.item(), 2)
             
-            if index%1200 == 0: # Intermediate metrics print
-                print("\nLoss: ", total_loss/counter, "Accuracy: ", train_correct/(counter*config['training']['bs']) ,"Train 0s: ", negative, "Train 1s:", positive)
+            lr_scheduler.step_update((t * (train_batches) + index))
+            times_per_batch.append(round((datetime.now()-start_time).seconds))
+            
+            if index%500 == 0: # Intermediate metrics print
+                expected_time = str(timedelta(seconds=((mean(times_per_batch))*total_batches-index)))
+                print("\nLoss: ", total_loss/counter, "Accuracy: ", train_correct/(counter*config['training']['bs']) ,"Train 0s: ", negative, "Train 1s:", positive, "Expected Time:", expected_time)
 
 
             for i in range(config['training']['bs']):
@@ -266,6 +295,7 @@ if __name__ == "__main__":
         val_counter = 0
         train_correct /= train_samples
         total_loss /= counter
+        
         model.eval()
         for index, (videos, size_embeddings, masks, labels) in enumerate(val_dl):
             b, f, _, _, _= videos.shape
@@ -275,7 +305,6 @@ if __name__ == "__main__":
 
             with torch.no_grad():
                 if opt.freeze_backbone:
-                    model = model.cpu()
                     features_extractor = features_extractor.to(opt.gpu_id)
 
                 videos = rearrange(videos, 'b f h w c -> (b f) c h w')                                       # B*8 x 3 x 224 x 224
@@ -283,7 +312,6 @@ if __name__ == "__main__":
                 features = rearrange(features, '(b f) c h w -> b f c h w', b = b, f = f)   
                 
                 if opt.freeze_backbone:
-                    features_extractor = features_extractor.cpu()
                     model = model.to(opt.gpu_id)
 
                 val_pred = model(features, mask=masks, size_embedding=size_embeddings)
@@ -301,7 +329,9 @@ if __name__ == "__main__":
         torch.cuda.empty_cache() 
 
     
-        scheduler.step()
+        #scheduler.step()
+
+
         bar.finish()
             
         
@@ -321,12 +351,15 @@ if __name__ == "__main__":
         tb_logger.add_scalar("Validation/Accuracy", val_correct, t)
 
         previous_loss = total_val_loss
+            
         print("#" + str(t) + "/" + str(opt.num_epochs) + " loss:" +
             str(total_loss) + " accuracy:" + str(train_correct) +" val_loss:" + str(total_val_loss) + " val_accuracy:" + str(val_correct) + " val_0s:" + str(val_negative) + "/" + str(val_counters[0]) + " val_1s:" + str(val_positive) + "/" + str(val_counters[1]))
     
-        if not os.path.exists(MODELS_PATH):
-            os.makedirs(MODELS_PATH)
+        if not os.path.exists(opt.models_output_path):
+            os.makedirs(opt.models_output_path)
         
-        torch.save(features_extractor.state_dict(), os.path.join(MODELS_PATH,  "EfficientNetExtractor_checkpoint" + str(t)))
-        torch.save(model.state_dict(), os.path.join(MODELS_PATH,  "SizeInvariantTimeSformer_checkpoint" + str(t)))
+        
+        if previous_loss > total_val_loss:
+            torch.save(features_extractor.state_dict(), os.path.join(opt.models_output_path,  "EfficientNetExtractor_checkpoint" + str(t)))
+            torch.save(model.state_dict(), os.path.join(opt.models_output_path,  "SizeInvariantTimeSformer_checkpoint" + str(t)))
         

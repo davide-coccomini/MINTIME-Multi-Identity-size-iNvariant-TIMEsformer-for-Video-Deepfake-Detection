@@ -2,6 +2,7 @@ import torch
 from torch.utils.data import DataLoader, TensorDataset, Dataset
 import cv2 
 import numpy as np
+from datetime import datetime
 import os
 import magic
 from albumentations import Compose, RandomBrightnessContrast, HorizontalFlip, FancyPCA, HueSaturationValue, OneOf, ToGray, ShiftScaleRotate, ImageCompression, PadIfNeeded, GaussNoise, GaussianBlur, Rotate, Normalize
@@ -54,14 +55,31 @@ class DeepFakesDataset(Dataset):
             IsotropicResize(max_side=size, interpolation_down=cv2.INTER_AREA, interpolation_up=cv2.INTER_CUBIC),
             PadIfNeeded(min_height=size, min_width=size, border_mode=cv2.BORDER_CONSTANT),
         ])
-        
+
+    def filter_duplicates(self, faces):
+        filtered_faces = []
+        selected_frames = []
+        for face in faces:
+            frame = int(face.split("_")[0])
+            if frame in selected_frames:
+                continue
+            else:
+                selected_frames.append(frame)
+                filtered_faces.append(face)
+        return filtered_faces
+
+
     def get_largest_identity(self, identities):
         max_side = 0
         max_identity = None
         for identity in identities:
             if os.path.basename(identity) == "discarded":
                 continue
-            faces = os.listdir(identity)
+            
+            faces = sorted(os.listdir(identity), key=lambda x:int(x.split("_")[0]))
+
+            faces = self.filter_duplicates(faces)
+       
             t = magic.from_file(os.path.join(identity, faces[0]))
             shape = re.search('(\d+) x (\d+)', t).groups()
             if int(shape[0]) > max_side:

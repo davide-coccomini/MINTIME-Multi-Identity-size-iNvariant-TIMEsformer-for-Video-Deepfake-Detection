@@ -327,6 +327,11 @@ python3 train.py --config config/identity_network.yaml --model 2 --train_list_fi
 ## Evaluation
 TODO
 
+### Baseline 
+To validate the real effectiveness of the implementation choices made on the presented architecture, we also conducted some alternative architecture training. In particular, the simplest of the two consists of a freezed EfficientNet-B0 pre-trained on the DFDC and FaceForensics++ datasets but whose output features, instead of going into a Transformer as in the original architecture, are given as input directly to a simple MLP. 
+![Baseline](images/baseline.gif)
+
+Faces of the same identity extracted from several frames are combined before being fed back to the network by a simple average.
 
 ## Additional Parameters
 In all the scripts the following parameters can be also customized:

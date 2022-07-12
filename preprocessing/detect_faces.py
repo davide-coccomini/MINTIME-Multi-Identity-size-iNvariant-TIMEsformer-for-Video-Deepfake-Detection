@@ -29,26 +29,28 @@ def process_videos(videos, detector_cls: Type[VideoFaceDetector], opt):
     for item in tqdm(loader): 
         result = {}
         video, indices, fps, frames = item[0]
-        id = os.path.splitext(os.path.basename(video))[0]
-        tmp = video.split("video")[-1]
-        out_dir = opt.output_path + tmp
+        id = video.split(opt.data_path)[-1]
+        out_dir = opt.output_path + id
         out_dir = out_dir.replace("video.mp4", '')
 
         # Skip already detected videos to improve speed
-        if os.path.exists(out_dir) and "{}.json".format(id) in os.listdir(out_dir):
+        '''
+        if os.path.exists(out_dir) and "video.json" in os.listdir(out_dir):
             continue
-
+        '''
         if fps == 0:
             print("Zero fps video", video)
             continue
 
         # Split the video into frames and detect faces for each frame
-        frames = [frames[i] for i in range(0, len(frames), fps)]
+        #frames = [frames[i] for i in range(0, len(frames), fps)]
+        
         result.update({i : b for i, b in zip(indices, detector._detect_faces(frames))})
 
         # Save faces as json dictionary into output folder
         os.makedirs(out_dir, exist_ok=True)
-        with open(os.path.join(out_dir, "{}.json".format(id)), "w") as f:
+        
+        with open(os.path.join(out_dir, "video.json"), "w") as f:
             json.dump(result, f)
         
         # Check if some faces have been detected
@@ -72,12 +74,12 @@ def process_videos(videos, detector_cls: Type[VideoFaceDetector], opt):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--list_file', default="outputs/2.txt", type=str,
+    parser.add_argument('--list_file', default="../../datasets/ForgeryNet/Training/video_list_complete.txt", type=str,
                         help='Video List txt file path)')
     parser.add_argument('--data_path', type=str,
                         help='Data directory', default='../../datasets/ForgeryNet/Training/video')
     parser.add_argument('--output_path', type=str,
-                        help='Output directory', default='../../datasets/ForgeryNet/Training/boxes')
+                        help='Output directory', default='../../datasets/ForgeryNet/Training/boxes_better')
     parser.add_argument("--detector_type", help="type of the detector", default="FacenetDetector",
                         choices=["FacenetDetector"])
     parser.add_argument('--gpu_id', default=0, type=int,
@@ -97,22 +99,21 @@ def main():
     df = pd.read_csv(opt.list_file, sep=' ', names=column_names)   
     videos_paths = df.values.tolist()
     videos_paths = list(dict.fromkeys([os.path.join(opt.data_path, os.path.dirname(row[1].split(" ")[0]), "video.mp4") for row in videos_paths]))
-
+    '''
     # Ignore already extracted videos to improve speed
     excluded_videos = []
     for path in videos_paths:
-        id = os.path.splitext(os.path.basename(path))[0]
-        tmp = path.split("video")[-1]
-        out_dir = opt.output_path + tmp
+        id = path.split(opt.data_path)[-1]
+        out_dir = opt.output_path + id
         out_dir = out_dir.replace("video.mp4", '')
-        if os.path.exists(out_dir) and "{}.json".format(id) in os.listdir(out_dir):
+        if os.path.exists(out_dir) and "video.json" in os.listdir(out_dir):
             excluded_videos.append(path)
-
-    paths = [video_path for video_path in videos_paths if video_path not in excluded_videos]
+    
+    videos_paths = [video_path for video_path in videos_paths if video_path not in excluded_videos]
     print("Excluded videos:", len(excluded_videos))
-
+    '''
     # Start face detection
-    process_videos(paths, opt.detector_type, opt)
+    process_videos(videos_paths, opt.detector_type, opt)
     
 if __name__ == "__main__":
     main()

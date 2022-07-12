@@ -40,11 +40,8 @@ class FacenetDetector(VideoFaceDetector):
     def __init__(self, device="cuda:0") -> None:
         super().__init__()
         self.detector =  MTCNN(
-            keep_all=True,
-            post_process=False,
             device=device,
-            selection_method="probability",
-            thresholds=[0.65, 0.75, 0.95],
+            thresholds=[0.85, 0.95, 0.95],
             margin=0,
         )
 

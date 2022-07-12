@@ -21,10 +21,10 @@ cv2.ocl.setUseOpenCL(False)
 cv2.setNumThreads(0)
 from tqdm import tqdm
 
-
 def extract_video(video, data_path):
     # Composes the path where the coordinates of the detected faces were saved
-    bboxes_path = data_path +  "/boxes" + video.split("video")[-1].split(".")[0] + ".json"
+    
+    bboxes_path = data_path +  "/boxes_better/" + video.split("video/")[-1].split(".")[0] + ".json"
     if not os.path.exists(bboxes_path) or not os.path.exists(video):
         print(bboxes_path, "not found")
         return
@@ -34,14 +34,30 @@ def extract_video(video, data_path):
         bboxes_dict = json.load(bbox_f)
     capture = cv2.VideoCapture(video)
     frames_num = int(capture.get(cv2.CAP_PROP_FRAME_COUNT))
+    fps = int(capture.get(5))
    
+
     # For each frame, save the detected faces into files
     counter = 0
+    frames = []
     for i in range(frames_num):
         capture.grab()
         success, frame = capture.retrieve()
-        if not success or str(i) not in bboxes_dict:
+        if not success:
             continue
+        frames.append(frame)
+
+    explored_indexes = []
+    for i in range(0, len(frames), fps):
+
+        while str(i) not in bboxes_dict:
+            if i == frames_num - 1:
+                i -= 1
+            if i in explored_indexes:
+                break
+            else:
+                explored_indexes.append(i)
+        frame = frames[i]
         id = os.path.splitext(os.path.basename(video))[0]
         crops = []
         bboxes = bboxes_dict[str(i)]
@@ -49,7 +65,7 @@ def extract_video(video, data_path):
             continue
         else:
             counter += 1
-
+        
         for bbox in bboxes:
             xmin, ymin, xmax, ymax = [int(b * 2) for b in bbox]
             w = xmax - xmin
@@ -86,6 +102,7 @@ def extract_video(video, data_path):
                 else:
                     crop = crop[:,:-1]
 
+            
             # Add the extracted face to the list
             crops.append(crop)
 
@@ -104,11 +121,11 @@ def extract_video(video, data_path):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--list_file', default="outputs/8.txt", type=str,
+    parser.add_argument('--list_file', default="../../datasets/ForgeryNet/Training/video_list_complete.txt", type=str,
                         help='Images List txt file path)')
     parser.add_argument('--data_path', default='../../datasets/ForgeryNet/Training', type=str,
                         help='Videos directory')
-    parser.add_argument('--output_path', default='../../datasets/ForgeryNet/Training/crops', type=str,
+    parser.add_argument('--output_path', default='../../datasets/ForgeryNet/Training/crops_better', type=str,
                         help='Output directory')
     parser.add_argument('--gpu_id', default=0, type=int,
                         help='ID of GPU to be used')

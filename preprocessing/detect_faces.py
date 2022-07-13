@@ -34,16 +34,14 @@ def process_videos(videos, detector_cls: Type[VideoFaceDetector], opt):
         out_dir = out_dir.replace("video.mp4", '')
 
         # Skip already detected videos to improve speed
-        '''
+        
         if os.path.exists(out_dir) and "video.json" in os.listdir(out_dir):
             continue
-        '''
+        
         if fps == 0:
             print("Zero fps video", video)
             continue
 
-        # Split the video into frames and detect faces for each frame
-        #frames = [frames[i] for i in range(0, len(frames), fps)]
         
         result.update({i : b for i, b in zip(indices, detector._detect_faces(frames))})
 
@@ -99,7 +97,7 @@ def main():
     df = pd.read_csv(opt.list_file, sep=' ', names=column_names)   
     videos_paths = df.values.tolist()
     videos_paths = list(dict.fromkeys([os.path.join(opt.data_path, os.path.dirname(row[1].split(" ")[0]), "video.mp4") for row in videos_paths]))
-    '''
+    
     # Ignore already extracted videos to improve speed
     excluded_videos = []
     for path in videos_paths:
@@ -111,7 +109,7 @@ def main():
     
     videos_paths = [video_path for video_path in videos_paths if video_path not in excluded_videos]
     print("Excluded videos:", len(excluded_videos))
-    '''
+    videos_paths = videos_paths[10:]
     # Start face detection
     process_videos(videos_paths, opt.detector_type, opt)
     

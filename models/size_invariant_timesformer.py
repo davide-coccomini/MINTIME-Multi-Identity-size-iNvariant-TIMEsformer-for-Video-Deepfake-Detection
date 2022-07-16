@@ -5,6 +5,8 @@ from einops import rearrange, repeat
 
 from models.efficientnet.efficientnet_pytorch import EfficientNet
 from torch.nn.init import trunc_normal_
+import cv2
+import numpy as np
 
 # helpers
 def exists(val):
@@ -75,6 +77,7 @@ class FeedForward(nn.Module):
 
 def attn(q, k, v, mask = None):
     sim = einsum('b i d, b j d -> b i j', q, k)
+    print("sim",sim.shape, mask.shape)
     if exists(mask):
         max_neg_value = -torch.finfo(sim.dtype).max
         sim.masked_fill_(~mask, max_neg_value)
@@ -101,7 +104,7 @@ class Attention(nn.Module):
             nn.Dropout(dropout)
         )
 
-    def forward(self, x, einops_from, einops_to, mask = None, cls_mask = None, rot_emb = None, **einops_dims):
+    def forward(self, x, einops_from, einops_to, mask = None, cls_mask = None, identities_mask = None, rot_emb = None, **einops_dims):
         h = self.heads
         q, k, v = self.to_qkv(x).chunk(3, dim = -1)
         q, k, v = map(lambda t: rearrange(t, 'b n (h d) -> (b h) n d', h = h), (q, k, v))
@@ -149,6 +152,7 @@ class SizeInvariantTimeSformer(nn.Module):
         super().__init__()
         self.dim = config['model']['dim']
         self.num_frames = config['model']['num-frames']
+        self.max_identities = config['model']['max-identities']
         self.image_size = config['model']['image-size']
         self.num_classes = config['model']['num-classes']
         self.patch_size = config['model']['patch-size']
@@ -213,7 +217,7 @@ class SizeInvariantTimeSformer(nn.Module):
             return {'pos_emb', 'cls_token'}
 
 
-    def forward(self, x, mask = None, size_embedding = None):
+    def forward(self, x, mask = None,  identities_mask = None, size_embedding = None):
         b, f, c, h, w, *_, device = *x.shape, x.device
         n = h * w
         x = rearrange(x, 'b f c h w -> b (f h w) c')                                   # B x F*P*P x C
@@ -234,16 +238,30 @@ class SizeInvariantTimeSformer(nn.Module):
             size_embedding = torch.cat((cls_token, size_embedding), dim = 1)
             size_embedding = size_embedding.to(device).int()
             x += self.size_emb(size_embedding)
+        frame_mask = repeat(mask, 'b f1 -> b f2 f1', f2 = self.num_frames)
         
-        # calculate masking for uneven number of frames
-        frame_mask = None
-        cls_attn_mask = None
+        frame_mask = torch.logical_and(frame_mask, identities_mask)
+        frame_mask = F.pad(frame_mask, (1, 0), value= True)
+        b, f1, f2 = frame_mask.shape
+        cls_row = torch.ones((b, 1, f2)).bool().to(device)
+        frame_mask = torch.cat((frame_mask, cls_row), dim=1)
+        
+        frame_mask = repeat(frame_mask, 'b f1 f2 -> (b h n) f1 f2', n = n, h = self.heads)
+        
+        print(frame_mask.shape)
+        '''
+        for f_index, f in enumerate(frame_mask):
+            cv2.imwrite("outputs/masks/frame_mask_" + str(f_index) + ".png", f.cpu().detach().numpy()*255)
+        '''
+        with open('outputs/masks/frame_mask.txt', 'a') as fp:
+            for b in frame_mask:
+                for f_index, f in enumerate(b):
+                    for n in f:
+                        fp.write("%s " % n.detach().cpu().numpy())
+                    fp.write("\n")
 
-        if exists(mask):
-            mask_with_cls = F.pad(mask, (1, 0), value = True)
-            frame_mask = repeat(mask_with_cls, 'b f -> (b h n) () f', n = n, h = self.heads)
-            cls_attn_mask = repeat(mask, 'b f -> (b h) () (f n)', n = n, h = self.heads)
-            cls_attn_mask = F.pad(cls_attn_mask, (1, 0), value = True)
+        cls_attn_mask = repeat(mask, 'b f -> (b h) () (f n)', n = n, h = self.heads)
+        cls_attn_mask = F.pad(cls_attn_mask, (1, 0), value = True)
 
         # time and space attention
 

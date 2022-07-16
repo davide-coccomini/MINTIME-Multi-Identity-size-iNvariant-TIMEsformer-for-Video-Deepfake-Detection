@@ -152,6 +152,12 @@ class DeepFakesDataset(Dataset):
             last_range_end += self.max_faces_per_identity[identity_index]
 
 
+        if len(identity_images) < self.sequence_length:
+            diff = self.sequence_length - len(identity_images)
+            identity_images = np.concatenate((identity_images, torch.zeros(diff, self.image_size, self.image_size, 3, dtype=torch.double)))
+            mask_test = [1 if i < self.sequence_length - diff else 0 for i in range(self.sequence_length)]
+        else:
+            mask_test = [1 for i in range(self.sequence_length)]
 
         return torch.tensor(sequence).float(), torch.tensor(size_embeddings).int(), torch.tensor(mask).bool(), torch.tensor(identities_mask).bool(), self.y[index]
 

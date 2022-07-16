@@ -34,10 +34,10 @@ from models.baseline import Baseline
 
 
 
-BASE_DIR = './'
-DATA_DIR = os.path.join(BASE_DIR, "datasets/ForgeryNet/faces")
+BASE_DIR = '../'
+DATA_DIR = os.path.join(BASE_DIR, "datasets/ForgeryNet/faces_test")
 TRAINING_DIR = os.path.join(DATA_DIR, "train")
-VALIDATION_DIR = os.path.join(DATA_DIR, "val")
+VALIDATION_DIR = os.path.join(DATA_DIR, "test")
 TEST_DIR = os.path.join(DATA_DIR, "test")
 
 
@@ -166,6 +166,7 @@ if __name__ == "__main__":
     paths = []
     # 1. Read csv of training and validation set
     col_names = ["video", "label", "8_cls"]
+    '''
     df_train = pd.read_csv(opt.train_list_file, sep=' ', names=col_names)
     df_validation = pd.read_csv(opt.validation_list_file, sep=' ', names=col_names)
     
@@ -182,8 +183,17 @@ if __name__ == "__main__":
         train_labels = train_labels[:opt.max_videos]
         validation_videos = validation_videos[:opt.max_videos]
         validation_labels = validation_labels[:opt.max_videos]
+    '''
+    '''REMOVE ME'''
 
+    train_videos = ["train/1/9dcec7ba1ade17a4a55a328442edee82/1119795ea32824f8bdad73bcb72b98d4/video.mp4", "train/19/2188af8e4ac9bbb289687eda5fda8049/video.mp4"]
+    train_labels = [0,1]
 
+    
+    validation_videos = ["test/1/7af2da72043ab79b044d98e1b0ad7eee/9f5b1dbe96d0662906b43661805e7171/video.mp4"]
+    validation_labels = [0]
+    
+    '''REMOVE ME'''
     train_samples = len(train_videos)
     validation_samples = len(validation_videos)
 
@@ -211,14 +221,14 @@ if __name__ == "__main__":
 
     # Create the data loaders
     
-    train_dataset = DeepFakesDataset(train_videos, train_labels, config['model']['image-size'], sequence_length=config['model']['num-frames'])
+    train_dataset = DeepFakesDataset(train_videos, train_labels, config['model']['image-size'], sequence_length=config['model']['num-frames'], max_identities=config['model']['max-identities'])
     train_dl = torch.utils.data.DataLoader(train_dataset, batch_size=config['training']['bs'], shuffle=True, sampler=None,
                                  batch_sampler=None, num_workers=opt.workers, collate_fn=None,
                                  pin_memory=False, drop_last=False, timeout=0,
                                  worker_init_fn=None, prefetch_factor=2,
                                  persistent_workers=False)
 
-    validation_dataset = DeepFakesDataset(validation_videos, validation_labels, config['model']['image-size'], sequence_length=config['model']['num-frames'], mode='val')
+    validation_dataset = DeepFakesDataset(validation_videos, validation_labels, config['model']['image-size'], sequence_length=config['model']['num-frames'], max_identities=config['model']['max-identities'], mode='val')
     val_dl = torch.utils.data.DataLoader(validation_dataset, batch_size=config['training']['val_bs'], shuffle=True, sampler=None,
                                     batch_sampler=None, num_workers=opt.workers, collate_fn=None,
                                     pin_memory=False, drop_last=False, timeout=0,
@@ -250,12 +260,15 @@ if __name__ == "__main__":
         train_batches = len(train_dl)
         val_batches = len(val_dl)
         total_batches = train_batches + val_batches
-        for index, (videos, size_embeddings, masks, labels) in enumerate(train_dl):
+        print("train")
+        for index, (videos, size_embeddings, masks, identities_masks, labels) in enumerate(train_dl):
             start_time = datetime.now()
             b, f, h, w, c = videos.shape
             labels = labels.unsqueeze(1).float()
             videos = videos.to(opt.gpu_id)
+            identities_masks = identities_masks.to(opt.gpu_id)
             masks = masks.to(opt.gpu_id)
+
             if opt.model == 0: 
                 videos = reduce(videos, "b f h w c -> b h w c", 'mean')
                 videos = rearrange(videos, "b h w c -> b c h w")
@@ -270,7 +283,7 @@ if __name__ == "__main__":
                     features = features_extractor.extract_features(videos)                                               # B*8 x 1280 x 7 x 7
     
                 features = rearrange(features, '(b f) c h w -> b f c h w', b = b, f = f)
-                y_pred = model(features, mask=masks, size_embedding=size_embeddings)
+                y_pred = model(features, mask=masks, size_embedding=size_embeddings, identities_mask=identities_masks)
         
 
             videos = videos.cpu()
@@ -309,16 +322,27 @@ if __name__ == "__main__":
         train_correct /= train_samples
         total_loss /= counter
         model.eval()
-        for index, (videos, size_embeddings, masks, labels) in enumerate(val_dl):
+        print("val")
+        for index, (videos, size_embeddings, masks, identities_masks, labels) in enumerate(val_dl):
             b, f, _, _, _= videos.shape
             videos = videos.to(opt.gpu_id)
             masks = masks.to(opt.gpu_id)
+            identities_masks = identities_masks.to(opt.gpu_id)
             labels = labels.unsqueeze(1).float()
             with torch.no_grad():
-                videos = rearrange(videos, 'b f h w c -> (b f) c h w')                                       # B*8 x 3 x 224 x 224
-                features = features_extractor.extract_features(videos)                                           # B*8 x 1280 x 7 x 7
-                features = rearrange(features, '(b f) c h w -> b f c h w', b = b, f = f)   
-                val_pred = model(features, mask=masks, size_embedding=size_embeddings)
+
+
+                if opt.model == 0: 
+                    videos = reduce(videos, "b f h w c -> b h w c", 'mean')
+                    videos = rearrange(videos, "b h w c -> b c h w")
+                    features = features_extractor.extract_features(videos)  
+                    val_pred = model(features)
+                elif opt.model == 1:
+                    videos = rearrange(videos, 'b f h w c -> (b f) c h w')                                       # B*8 x 3 x 224 x 224
+                    features = features_extractor.extract_features(videos)                                           # B*8 x 1280 x 7 x 7
+                    features = rearrange(features, '(b f) c h w -> b f c h w', b = b, f = f)   
+                    val_pred = model(features, mask=masks, size_embedding=size_embeddings, identities_masks=identities_masks)
+
                 videos = videos.cpu()
                 val_pred = val_pred.cpu()
                 val_loss = loss_fn(val_pred, labels)

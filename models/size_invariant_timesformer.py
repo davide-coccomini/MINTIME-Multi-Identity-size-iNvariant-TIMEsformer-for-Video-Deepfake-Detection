@@ -77,7 +77,6 @@ class FeedForward(nn.Module):
 
 def attn(q, k, v, mask = None):
     sim = einsum('b i d, b j d -> b i j', q, k)
-    print("sim",sim.shape, mask.shape)
     if exists(mask):
         max_neg_value = -torch.finfo(sim.dtype).max
         sim.masked_fill_(~mask, max_neg_value)
@@ -223,14 +222,14 @@ class SizeInvariantTimeSformer(nn.Module):
         x = rearrange(x, 'b f c h w -> b (f h w) c')                                   # B x F*P*P x C
         tokens = self.to_patch_embedding(x)                                            # B x 8*7*7 x 256
 				
-        # add cls token
+        # Add cls token
         cls_token = repeat(self.cls_token, 'n d -> b n d', b = b)
         x =  torch.cat((cls_token, tokens), dim = 1)
 
-        # positional embedding
+        # Positional embedding
         x += self.pos_emb(torch.arange(x.shape[1], device = device))
         
-        # size embedding
+        # Size embedding
         if self.enable_size_emb:
             size_embedding = repeat(size_embedding, 'b f -> b f p', p=self.num_patches)      # B x 8 x 49   
             size_embedding = rearrange(size_embedding, 'b f p -> b (f p)')
@@ -238,33 +237,18 @@ class SizeInvariantTimeSformer(nn.Module):
             size_embedding = torch.cat((cls_token, size_embedding), dim = 1)
             size_embedding = size_embedding.to(device).int()
             x += self.size_emb(size_embedding)
-        frame_mask = repeat(mask, 'b f1 -> b f2 f1', f2 = self.num_frames)
         
+        # Frame mask
+        frame_mask = repeat(mask, 'b f1 -> b f2 f1', f2 = self.num_frames)
         frame_mask = torch.logical_and(frame_mask, identities_mask)
         frame_mask = F.pad(frame_mask, (1, 0), value= True)
-        b, f1, f2 = frame_mask.shape
-        cls_row = torch.ones((b, 1, f2)).bool().to(device)
-        frame_mask = torch.cat((frame_mask, cls_row), dim=1)
-        
         frame_mask = repeat(frame_mask, 'b f1 f2 -> (b h n) f1 f2', n = n, h = self.heads)
-        
-        print(frame_mask.shape)
-        '''
-        for f_index, f in enumerate(frame_mask):
-            cv2.imwrite("outputs/masks/frame_mask_" + str(f_index) + ".png", f.cpu().detach().numpy()*255)
-        '''
-        with open('outputs/masks/frame_mask.txt', 'a') as fp:
-            for b in frame_mask:
-                for f_index, f in enumerate(b):
-                    for n in f:
-                        fp.write("%s " % n.detach().cpu().numpy())
-                    fp.write("\n")
 
+        # CLS mask
         cls_attn_mask = repeat(mask, 'b f -> (b h) () (f n)', n = n, h = self.heads)
         cls_attn_mask = F.pad(cls_attn_mask, (1, 0), value = True)
-
-        # time and space attention
-
+  
+        # Time and space attention
         for (time_attn, spatial_attn, ff) in self.layers:
             x = time_attn(x, 'b (f n) d', '(b n) f d', n = n, mask = frame_mask, cls_mask = cls_attn_mask) + x
             x = spatial_attn(x, 'b (f n) d', '(b f) n d', f = f, cls_mask = cls_attn_mask) + x

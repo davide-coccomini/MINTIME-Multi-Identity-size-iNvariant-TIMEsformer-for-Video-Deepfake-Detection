@@ -19,16 +19,19 @@ DATA_DIR = "../datasets/ForgeryNet/faces_test"
 ORIGINAL_VIDEOS_PATH = {"train": "../datasets/ForgeryNet/Training/video/train_video_release", "val": "../datasets/ForgeryNet/Training/video/train_video_release", "test": "../datasets/ForgeryNet/Validation/video/val_video_release"}
 RANGE_SIZE = 5
 SIZE_EMB_DICT = [(1+i*RANGE_SIZE, (i+1)*RANGE_SIZE) if i != 0 else (0, RANGE_SIZE) for i in range(20)]
-
+MAX_FACES_DICT = {1: [self.num_frames], 
+                  2:  [int(self.num_frames/2), int(self.num_frames/2)] 
+                  3:  [int(self.num_frames/3), int(self.num_frames/3), int(self.num_frames/4)] 
+                  4:  [int(self.num_frames/3), int(self.num_frames/3), int(self.num_frames/8), int(self.num_frames/8)]}
 
 class DeepFakesDataset(Dataset):
-    def __init__(self, videos_paths, labels, image_size, mode = 'train', model = 0, sequence_length = 8, max_identities = 2, max_faces_per_identity = [7, 1]):
+    def __init__(self, videos_paths, labels, image_size, mode = 'train', model = 0, num_frames = 8, max_identities = 2, max_faces_per_identity = [7, 1]):
         self.x = videos_paths
         self.y = labels
         self.image_size = image_size
         self.mode = mode
         self.n_samples = len(videos_paths)
-        self.sequence_length = sequence_length
+        self.num_frames = num_frames
         self.max_identities = max_identities
         self.max_faces_per_identity = max_faces_per_identity
     
@@ -59,9 +62,10 @@ class DeepFakesDataset(Dataset):
         ])
 
 
-
+    
     def get_sorted_identities(self, identities):
         sorted_identities = []
+    
         for identity in identities:
             if not os.path.isdir(identity):
                 continue
@@ -73,13 +77,25 @@ class DeepFakesDataset(Dataset):
             number_of_faces = len(faces)
             sorted_identities.append((identity, max_side, number_of_faces))
 
+
         sorted_identities = sorted(sorted_identities, key=lambda x:x[1], reverse=True)
-        if len(sorted_identities) > self.max_identities:
+        identities_number = len(sorted_identities)
+        if identities_number > self.max_identities:
             sorted_identities = sorted_identities[:self.max_identities]
-       
+
+        if identities_number > 1:
+            max_faces_per_identity = MAX_FACES_DICT[identities_number]
+
+            # Adjust the list
+            for i in range(identities_number):
+                if sorted_identities[i][2] < max_faces_per_identity[index] and index < identities_number - 1:
+                    sorted_identities[i+1][2]+= max_faces_per_identity[index] - identity[2] 
+        else:
+            sorted_identities[0][2] = self.num_frames
+
         return sorted_identities
     
-        
+
     def __getitem__(self, index):
         video_path = self.x[index]
         video_path = os.path.join(DATA_DIR, video_path)
@@ -97,14 +113,13 @@ class DeepFakesDataset(Dataset):
         size_embeddings = []
         for identity_index, identity in enumerate(identities):
             identity_path = identity[0]
-            max_faces = self.max_faces_per_identity[identity_index]
+            max_faces = identities[2]
             faces = np.asarray(sorted(os.listdir(identity_path), key=lambda x:int(x.split("_")[0])))
 
             if len(faces) > max_faces:
                 idx = np.round(np.linspace(0, len(faces) - 1, max_faces)).astype(int)
                 faces = faces[idx]
 
-            
             identity_faces = []
             for face in faces:
                 face_path = os.path.join(identity_path, face)
@@ -146,7 +161,7 @@ class DeepFakesDataset(Dataset):
         identities_mask = []
         last_range_end = 0
         for identity_index in range(len(self.max_faces_per_identity)):
-            identity_mask = [True if i >= last_range_end and i < last_range_end + self.max_faces_per_identity[identity_index] else False for i in range(0, self.sequence_length)]
+            identity_mask = [True if i >= last_range_end and i < last_range_end + self.max_faces_per_identity[identity_index] else False for i in range(0, self.num_frames)]
             for k in range(self.max_faces_per_identity[identity_index]):
                 identities_mask.append(identity_mask)
             last_range_end += self.max_faces_per_identity[identity_index]

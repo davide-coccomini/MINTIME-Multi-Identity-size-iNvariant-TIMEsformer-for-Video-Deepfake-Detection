@@ -221,14 +221,14 @@ if __name__ == "__main__":
 
     # Create the data loaders
     
-    train_dataset = DeepFakesDataset(train_videos, train_labels, config['model']['image-size'], sequence_length=config['model']['num-frames'], max_identities=config['model']['max-identities'])
+    train_dataset = DeepFakesDataset(train_videos, train_labels, config['model']['image-size'], num_frames=config['model']['num-frames'], max_identities=config['model']['max-identities'])
     train_dl = torch.utils.data.DataLoader(train_dataset, batch_size=config['training']['bs'], shuffle=True, sampler=None,
                                  batch_sampler=None, num_workers=opt.workers, collate_fn=None,
                                  pin_memory=False, drop_last=False, timeout=0,
                                  worker_init_fn=None, prefetch_factor=2,
                                  persistent_workers=False)
 
-    validation_dataset = DeepFakesDataset(validation_videos, validation_labels, config['model']['image-size'], sequence_length=config['model']['num-frames'], max_identities=config['model']['max-identities'], mode='val')
+    validation_dataset = DeepFakesDataset(validation_videos, validation_labels, config['model']['image-size'], num_frames=config['model']['num-frames'], max_identities=config['model']['max-identities'], mode='val')
     val_dl = torch.utils.data.DataLoader(validation_dataset, batch_size=config['training']['val_bs'], shuffle=True, sampler=None,
                                     batch_sampler=None, num_workers=opt.workers, collate_fn=None,
                                     pin_memory=False, drop_last=False, timeout=0,
@@ -260,7 +260,6 @@ if __name__ == "__main__":
         train_batches = len(train_dl)
         val_batches = len(val_dl)
         total_batches = train_batches + val_batches
-        print("train")
         for index, (videos, size_embeddings, masks, identities_masks, labels) in enumerate(train_dl):
             start_time = datetime.now()
             b, f, h, w, c = videos.shape
@@ -322,7 +321,6 @@ if __name__ == "__main__":
         train_correct /= train_samples
         total_loss /= counter
         model.eval()
-        print("val")
         for index, (videos, size_embeddings, masks, identities_masks, labels) in enumerate(val_dl):
             b, f, _, _, _= videos.shape
             videos = videos.to(opt.gpu_id)

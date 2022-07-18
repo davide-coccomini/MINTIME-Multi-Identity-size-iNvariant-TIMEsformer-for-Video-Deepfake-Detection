@@ -97,7 +97,6 @@ if __name__ == '__main__':
         values = list(validation_counter.values())
         x = [i for i in range(len(training_counter))]
         plt.bar(x, values, 0.3, tick_label=names, label = "Validation Set")
-
     
     # Reading of the validation set (which will be used as a test set) and extraction of its distribution excluding videos in which no faces were found.
     skipped = 0
@@ -176,5 +175,3 @@ for key in datasets:
             f.write(row)
             
     f.close()
-
-    

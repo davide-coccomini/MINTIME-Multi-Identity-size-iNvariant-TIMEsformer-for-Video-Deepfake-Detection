@@ -30,14 +30,12 @@ def move_files(face_paths):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--faces_path', default="../../datasets/ForgeryNet/faces_test", type=str,
+    parser.add_argument('--faces_path', default="../../datasets/ForgeryNet/faces", type=str,
                         help='Path of folder containing train/val/test with extracted cropped faces to be clustered.')
     parser.add_argument('--gpu_id', default=0, type=int,
                         help='ID of GPU to be used.')
-    parser.add_argument('--similarity_threshold', default=0.8, type=float,
+    parser.add_argument('--similarity_threshold', default=0.55, type=float,
                         help='Threshold to discard faces with high distance.')
-    parser.add_argument('--min_faces_number_per_sequence', default=3, type=int,
-                        help='Minimum number of faces per sequence to be considered.')
     parser.add_argument('--valid_cluster_size_ratio', default=0.2, type=int,
                         help='Valid cluster size ratio.')
     parser.add_argument('--workers', default=40, type=int,
@@ -56,10 +54,18 @@ if __name__ == '__main__':
         print("Clustering videos in ", dataset_path)
         set_paths = glob.glob(f'{dataset_path}/*/**/*.mp4', recursive=True)
     
+        excluded_videos = []
+        for path in set_paths:
+            if os.path.exists(os.path.join(path, "0")):
+                excluded_videos.append(path)
 
+        set_paths = [video_path for video_path in set_paths if video_path not in excluded_videos]
+        print("Excluded already clustered videos: ", len(excluded_videos))
+        
         # For each video in each set, perform faces clustering
         bar = ChargingBar('Clustered videos', max=(len(set_paths)))
         for path in set_paths:
+            print(path)
             # Read all faces, load them into a dictionary 
             faces_files = [face_file for face_file in os.listdir(path) if not os.path.isdir(os.path.join(path, face_file))]
             faces_files = sorted(faces_files, key=lambda x:(int(x.split("_")[0]), int(os.path.splitext(x)[0].split("_")[1])))

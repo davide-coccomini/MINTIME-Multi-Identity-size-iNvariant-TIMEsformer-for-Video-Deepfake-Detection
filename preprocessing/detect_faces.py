@@ -72,12 +72,12 @@ def process_videos(videos, detector_cls: Type[VideoFaceDetector], opt):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--list_file', default="../../datasets/ForgeryNet/Training/video_list_complete.txt", type=str,
+    parser.add_argument('--list_file', default="../../datasets/ForgeryNet/Validation/video_list.txt", type=str,
                         help='Video List txt file path)')
     parser.add_argument('--data_path', type=str,
-                        help='Data directory', default='../../datasets/ForgeryNet/Training/video')
+                        help='Data directory', default='../../datasets/ForgeryNet/Validation/video')
     parser.add_argument('--output_path', type=str,
-                        help='Output directory', default='../../datasets/ForgeryNet/Training/boxes_better')
+                        help='Output directory', default='../../datasets/ForgeryNet/Validation/boxes')
     parser.add_argument("--detector_type", help="type of the detector", default="FacenetDetector",
                         choices=["FacenetDetector"])
     parser.add_argument('--gpu_id', default=0, type=int,
@@ -109,7 +109,7 @@ def main():
     
     videos_paths = [video_path for video_path in videos_paths if video_path not in excluded_videos]
     print("Excluded videos:", len(excluded_videos))
-    videos_paths = videos_paths[10:]
+    videos_paths = videos_paths[14:]
     # Start face detection
     process_videos(videos_paths, opt.detector_type, opt)
     

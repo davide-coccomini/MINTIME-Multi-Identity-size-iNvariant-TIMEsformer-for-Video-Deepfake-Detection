@@ -24,7 +24,7 @@ from tqdm import tqdm
 def extract_video(video, data_path):
     # Composes the path where the coordinates of the detected faces were saved
     
-    bboxes_path = data_path +  "/boxes_better/" + video.split("video/")[-1].split(".")[0] + ".json"
+    bboxes_path = data_path +  "/boxes/" + video.split("video/")[-1].split(".")[0] + ".json"
     if not os.path.exists(bboxes_path) or not os.path.exists(video):
         print(bboxes_path, "not found")
         return
@@ -121,11 +121,11 @@ def extract_video(video, data_path):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--list_file', default="../../datasets/ForgeryNet/Training/video_list_complete.txt", type=str,
+    parser.add_argument('--list_file', default="../../datasets/ForgeryNet/Validation/video_list.txt", type=str,
                         help='Images List txt file path)')
-    parser.add_argument('--data_path', default='../../datasets/ForgeryNet/Training', type=str,
+    parser.add_argument('--data_path', default='../../datasets/ForgeryNet/Validation', type=str,
                         help='Videos directory')
-    parser.add_argument('--output_path', default='../../datasets/ForgeryNet/Training/crops_better', type=str,
+    parser.add_argument('--output_path', default='../../datasets/ForgeryNet/Validation/crops', type=str,
                         help='Output directory')
     parser.add_argument('--gpu_id', default=0, type=int,
                         help='ID of GPU to be used')

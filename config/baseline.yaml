@@ -1,5 +1,5 @@
 training:
-  lr: 1.0e-4
+  lr: 1.0e-5
   weight-decay: 0.0001
   bs: 48
   val_bs: 48
@@ -13,5 +13,5 @@ model:
   image-size: 224
   num-classes: 1
   dim: 1280
-  mlp-dim: 1024
+  mlp-dim: 256
   num-frames: 8

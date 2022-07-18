@@ -106,8 +106,10 @@ if __name__ == "__main__":
     
     if opt.model == 0:
         model = Baseline(config=config)
+        num_patches = None
     else:
         model = SizeInvariantTimeSformer(config=config)
+        num_patches = config['model']['num-patches']
 
     if opt.freeze_backbone:
         features_extractor.eval()
@@ -211,14 +213,14 @@ if __name__ == "__main__":
 
     # Create the data loaders
     
-    train_dataset = DeepFakesDataset(train_videos, train_labels, config['model']['image-size'], num_frames=config['model']['num-frames'], num_patches=config['model']['num-patches'], max_identities=config['model']['max-identities'])
+    train_dataset = DeepFakesDataset(train_videos, train_labels, config['model']['image-size'], num_frames=config['model']['num-frames'], num_patches=num_patches, max_identities=config['model']['max-identities'])
     train_dl = torch.utils.data.DataLoader(train_dataset, batch_size=config['training']['bs'], shuffle=True, sampler=None,
                                  batch_sampler=None, num_workers=opt.workers, collate_fn=None,
                                  pin_memory=False, drop_last=False, timeout=0,
                                  worker_init_fn=None, prefetch_factor=2,
                                  persistent_workers=False)
 
-    validation_dataset = DeepFakesDataset(validation_videos, validation_labels, config['model']['image-size'], num_frames=config['model']['num-frames'], num_patches=config['model']['num-patches'], max_identities=config['model']['max-identities'], mode='val')
+    validation_dataset = DeepFakesDataset(validation_videos, validation_labels, config['model']['image-size'], num_frames=config['model']['num-frames'], num_patches=num_patches, max_identities=config['model']['max-identities'], mode='val')
     val_dl = torch.utils.data.DataLoader(validation_dataset, batch_size=config['training']['val_bs'], shuffle=True, sampler=None,
                                     batch_sampler=None, num_workers=opt.workers, collate_fn=None,
                                     pin_memory=False, drop_last=False, timeout=0,
@@ -260,8 +262,10 @@ if __name__ == "__main__":
             positions = positions.to(opt.gpu_id)
 
             if opt.model == 0: 
-                videos = reduce(videos, "b f h w c -> b h w c", 'mean')
-                videos = rearrange(videos, "b h w c -> b c h w")
+                #videos = reduce(videos, "b f h w c -> b h w c", 'mean')
+                print(videos.shape)
+                videos = rearrange(videos, "b f h w c -> (b f) c h w")
+                print(videos.shape)
                 features = features_extractor.extract_features(videos)  
                 y_pred = model(features)
             elif opt.model == 1: 

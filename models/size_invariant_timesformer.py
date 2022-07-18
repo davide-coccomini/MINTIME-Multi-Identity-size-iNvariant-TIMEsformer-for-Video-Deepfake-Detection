@@ -216,7 +216,7 @@ class SizeInvariantTimeSformer(nn.Module):
             return {'pos_emb', 'cls_token'}
 
 
-    def forward(self, x, mask = None,  identities_mask = None, size_embedding = None):
+    def forward(self, x, mask = None,  identities_mask = None, size_embedding = None, positions=None):
         b, f, c, h, w, *_, device = *x.shape, x.device
         n = h * w
         x = rearrange(x, 'b f c h w -> b (f h w) c')                                   # B x F*P*P x C
@@ -227,8 +227,7 @@ class SizeInvariantTimeSformer(nn.Module):
         x =  torch.cat((cls_token, tokens), dim = 1)
 
         # Positional embedding
-        x += self.pos_emb(torch.arange(x.shape[1], device = device))
-        #TODO: Add the same pos_emb for same frame
+        x += self.pos_emb(positions)
 
         # Size embedding
         if self.enable_size_emb:

@@ -84,9 +84,7 @@ class DeepFakesDataset(Dataset):
 
         identities_number = len(sorted_identities)
         if identities_number > 1:
-            print("we", identities_number)
             max_faces_per_identity = self.max_faces_per_identity[identities_number]
-            print("max_faces_per_identity", max_faces_per_identity)
             # Adjust the list
             for i in range(identities_number):
                 if sorted_identities[i][2] < max_faces_per_identity[i] and i < identities_number - 1:
@@ -118,7 +116,6 @@ class DeepFakesDataset(Dataset):
             identity_path = identity[0]
             max_faces = identity[2]
             faces = np.asarray(sorted(os.listdir(identity_path), key=lambda x:int(x.split("_")[0])))
-            print(identity)
             if len(faces) > max_faces:
                 idx = np.round(np.linspace(0, len(faces) - 1, max_faces)).astype(int)
                 faces = faces[idx]
@@ -166,7 +163,6 @@ class DeepFakesDataset(Dataset):
             for k in range(identities[identity_index][2]):
                 identities_mask.append(identity_mask)
             last_range_end += identities[identity_index][2]
-        print(torch.tensor(mask).shape, torch.tensor(sequence).shape, torch.tensor(size_embeddings).shape, torch.tensor(identities_mask).shape)
         return torch.tensor(sequence).float(), torch.tensor(size_embeddings).int(), torch.tensor(mask).bool(), torch.tensor(identities_mask).bool(), self.y[index]
 
     def __len__(self):

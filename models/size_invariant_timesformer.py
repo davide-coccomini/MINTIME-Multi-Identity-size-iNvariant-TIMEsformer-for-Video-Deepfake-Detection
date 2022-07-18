@@ -225,10 +225,11 @@ class SizeInvariantTimeSformer(nn.Module):
         # Add cls token
         cls_token = repeat(self.cls_token, 'n d -> b n d', b = b)
         x =  torch.cat((cls_token, tokens), dim = 1)
-        print(torch.arange(x.shape[1]))
+
         # Positional embedding
         x += self.pos_emb(torch.arange(x.shape[1], device = device))
-        
+        #TODO: Add the same pos_emb for same frame
+
         # Size embedding
         if self.enable_size_emb:
             size_embedding = repeat(size_embedding, 'b f -> b f p', p=self.num_patches)      # B x 8 x 49   
@@ -237,12 +238,14 @@ class SizeInvariantTimeSformer(nn.Module):
             size_embedding = torch.cat((cls_token, size_embedding), dim = 1)
             size_embedding = size_embedding.to(device).int()
             x += self.size_emb(size_embedding)
-        
+       
+                
         # Frame mask
         frame_mask = repeat(mask, 'b f1 -> b f2 f1', f2 = self.num_frames)
         frame_mask = torch.logical_and(frame_mask, identities_mask)
         frame_mask = F.pad(frame_mask, (1, 0), value= True)
         frame_mask = repeat(frame_mask, 'b f1 f2 -> (b h n) f1 f2', n = n, h = self.heads)
+      
 
         # CLS mask
         cls_attn_mask = repeat(mask, 'b f -> (b h) () (f n)', n = n, h = self.heads)

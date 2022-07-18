@@ -19,13 +19,9 @@ DATA_DIR = "../datasets/ForgeryNet/faces_test"
 ORIGINAL_VIDEOS_PATH = {"train": "../datasets/ForgeryNet/Training/video/train_video_release", "val": "../datasets/ForgeryNet/Training/video/train_video_release", "test": "../datasets/ForgeryNet/Validation/video/val_video_release"}
 RANGE_SIZE = 5
 SIZE_EMB_DICT = [(1+i*RANGE_SIZE, (i+1)*RANGE_SIZE) if i != 0 else (0, RANGE_SIZE) for i in range(20)]
-MAX_FACES_DICT = {1: [self.num_frames], 
-                  2:  [int(self.num_frames/2), int(self.num_frames/2)] 
-                  3:  [int(self.num_frames/3), int(self.num_frames/3), int(self.num_frames/4)] 
-                  4:  [int(self.num_frames/3), int(self.num_frames/3), int(self.num_frames/8), int(self.num_frames/8)]}
 
 class DeepFakesDataset(Dataset):
-    def __init__(self, videos_paths, labels, image_size, mode = 'train', model = 0, num_frames = 8, max_identities = 2, max_faces_per_identity = [7, 1]):
+    def __init__(self, videos_paths, labels, image_size, mode = 'train', model = 0, num_frames = 8, max_identities = 3):
         self.x = videos_paths
         self.y = labels
         self.image_size = image_size
@@ -33,7 +29,11 @@ class DeepFakesDataset(Dataset):
         self.n_samples = len(videos_paths)
         self.num_frames = num_frames
         self.max_identities = max_identities
-        self.max_faces_per_identity = max_faces_per_identity
+        self.max_faces_per_identity = {1: [num_frames], 
+                  2:  [int(num_frames/2), int(num_frames/2)],
+                  3:  [int(num_frames/3), int(num_frames/3), int(num_frames/4)],
+                  4:  [int(num_frames/3), int(num_frames/3), int(num_frames/8), int(num_frames/8)]}
+
     
     def create_train_transforms(self, size):
         return Compose([
@@ -75,21 +75,24 @@ class DeepFakesDataset(Dataset):
             shape = re.search('(\d+) x (\d+)', t).groups()
             max_side = int(shape[0])
             number_of_faces = len(faces)
-            sorted_identities.append((identity, max_side, number_of_faces))
+            sorted_identities.append([identity, max_side, number_of_faces])
 
 
         sorted_identities = sorted(sorted_identities, key=lambda x:x[1], reverse=True)
-        identities_number = len(sorted_identities)
-        if identities_number > self.max_identities:
+        if len(sorted_identities) > self.max_identities:
             sorted_identities = sorted_identities[:self.max_identities]
 
+        identities_number = len(sorted_identities)
         if identities_number > 1:
-            max_faces_per_identity = MAX_FACES_DICT[identities_number]
-
+            print("we", identities_number)
+            max_faces_per_identity = self.max_faces_per_identity[identities_number]
+            print("max_faces_per_identity", max_faces_per_identity)
             # Adjust the list
             for i in range(identities_number):
-                if sorted_identities[i][2] < max_faces_per_identity[index] and index < identities_number - 1:
-                    sorted_identities[i+1][2]+= max_faces_per_identity[index] - identity[2] 
+                if sorted_identities[i][2] < max_faces_per_identity[i] and i < identities_number - 1:
+                    sorted_identities[i+1][2] += max_faces_per_identity[i] - sorted_identities[i][2] 
+                elif sorted_identities[i][2] > max_faces_per_identity[i]:
+                    sorted_identities[i][2] = max_faces_per_identity[i]
         else:
             sorted_identities[0][2] = self.num_frames
 
@@ -113,9 +116,9 @@ class DeepFakesDataset(Dataset):
         size_embeddings = []
         for identity_index, identity in enumerate(identities):
             identity_path = identity[0]
-            max_faces = identities[2]
+            max_faces = identity[2]
             faces = np.asarray(sorted(os.listdir(identity_path), key=lambda x:int(x.split("_")[0])))
-
+            print(identity)
             if len(faces) > max_faces:
                 idx = np.round(np.linspace(0, len(faces) - 1, max_faces)).astype(int)
                 faces = faces[idx]
@@ -145,7 +148,6 @@ class DeepFakesDataset(Dataset):
                     image = np.zeros((self.image_size, self.image_size, 3))
 
                 identity_images.append(image)
-                
             if len(identity_images) < max_faces: # The faces are less than max_faces so we need to add empty images
                 diff = max_faces - len(identity_size_embeddings)
                 identity_size_embeddings = np.concatenate((identity_size_embeddings, np.zeros(diff)))
@@ -153,19 +155,18 @@ class DeepFakesDataset(Dataset):
                 mask.extend([1 if i < max_faces - diff else 0 for i in range(max_faces)])
             else: # Otherwise all the faces are valid
                 mask.extend([1 for i in range(max_faces)])
-
-            
             size_embeddings.extend(identity_size_embeddings)
             sequence.extend(identity_images)
 
+
         identities_mask = []
         last_range_end = 0
-        for identity_index in range(len(self.max_faces_per_identity)):
-            identity_mask = [True if i >= last_range_end and i < last_range_end + self.max_faces_per_identity[identity_index] else False for i in range(0, self.num_frames)]
-            for k in range(self.max_faces_per_identity[identity_index]):
+        for identity_index in range(len(identities)):
+            identity_mask = [True if i >= last_range_end and i < last_range_end + identities[identity_index][2] else False for i in range(0, self.num_frames)]
+            for k in range(identities[identity_index][2]):
                 identities_mask.append(identity_mask)
-            last_range_end += self.max_faces_per_identity[identity_index]
-
+            last_range_end += identities[identity_index][2]
+        print(torch.tensor(mask).shape, torch.tensor(sequence).shape, torch.tensor(size_embeddings).shape, torch.tensor(identities_mask).shape)
         return torch.tensor(sequence).float(), torch.tensor(size_embeddings).int(), torch.tensor(mask).bool(), torch.tensor(identities_mask).bool(), self.y[index]
 
     def __len__(self):

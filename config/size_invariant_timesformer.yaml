@@ -1,8 +1,8 @@
 training:
   lr: 1.0e-5
   weight-decay: 0.0001
-  bs: 16
-  val_bs: 2
+  bs: 48
+  val_bs: 48
   optimizer: 'AdamW'
   scheduler: 'cosinelr' 
   gamma: 0.1

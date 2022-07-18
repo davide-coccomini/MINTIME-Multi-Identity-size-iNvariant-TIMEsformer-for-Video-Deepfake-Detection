@@ -21,13 +21,14 @@ RANGE_SIZE = 5
 SIZE_EMB_DICT = [(1+i*RANGE_SIZE, (i+1)*RANGE_SIZE) if i != 0 else (0, RANGE_SIZE) for i in range(20)]
 
 class DeepFakesDataset(Dataset):
-    def __init__(self, videos_paths, labels, image_size, mode = 'train', model = 0, num_frames = 8, max_identities = 3):
+    def __init__(self, videos_paths, labels, image_size, mode = 'train', model = 0, num_frames = 8, max_identities = 3, num_patches=49):
         self.x = videos_paths
         self.y = labels
         self.image_size = image_size
         self.mode = mode
         self.n_samples = len(videos_paths)
         self.num_frames = num_frames
+        self.num_patches = num_patches
         self.max_identities = max_identities
         self.max_faces_per_identity = {1: [num_frames], 
                   2:  [int(num_frames/2), int(num_frames/2)],
@@ -112,6 +113,8 @@ class DeepFakesDataset(Dataset):
         last_range_end = 0
         sequence = []
         size_embeddings = []
+        
+        images_frames = []
         for identity_index, identity in enumerate(identities):
             identity_path = identity[0]
             max_faces = identity[2]
@@ -143,7 +146,8 @@ class DeepFakesDataset(Dataset):
                     image = transform(image=image)['image']
                 except:
                     image = np.zeros((self.image_size, self.image_size, 3))
-
+                frame = int(os.path.basename(image_path).split("_")[0])
+                images_frames.append(frame)
                 identity_images.append(image)
             if len(identity_images) < max_faces: # The faces are less than max_faces so we need to add empty images
                 diff = max_faces - len(identity_size_embeddings)
@@ -163,7 +167,14 @@ class DeepFakesDataset(Dataset):
             for k in range(identities[identity_index][2]):
                 identities_mask.append(identity_mask)
             last_range_end += identities[identity_index][2]
-        return torch.tensor(sequence).float(), torch.tensor(size_embeddings).int(), torch.tensor(mask).bool(), torch.tensor(identities_mask).bool(), self.y[index]
+        
+        # Generate coherent temporal-positional embedding
+        images_frames_positions = {k: v+1 for v, k in enumerate(sorted(set(images_frames)))}
+        frame_positions = [images_frames_positions[frame] for frame in images_frames]      
+        positions = [[i+1 for i in range(((frame_position-1)*self.num_patches), self.num_patches*(frame_position))] for frame_position in frame_positions]
+        positions = sum(positions, []) # Merge the lists
+        positions.insert(0,0) # Add CLS
+        return torch.tensor(sequence).float(), torch.tensor(size_embeddings).int(), torch.tensor(mask).bool(), torch.tensor(identities_mask).bool(), torch.tensor(positions), self.y[index]
 
     def __len__(self):
         return self.n_samples

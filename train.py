@@ -32,19 +32,6 @@ from timm.scheduler.cosine_lr import CosineLRScheduler
 from models.baseline import Baseline
 
 
-
-
-BASE_DIR = '../'
-DATA_DIR = os.path.join(BASE_DIR, "datasets/ForgeryNet/faces_test")
-TRAINING_DIR = os.path.join(DATA_DIR, "train")
-VALIDATION_DIR = os.path.join(DATA_DIR, "test")
-TEST_DIR = os.path.join(DATA_DIR, "test")
-
-
-
-
-
-# Main body
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     
@@ -86,17 +73,19 @@ if __name__ == "__main__":
     with open(opt.config, 'r') as ymlfile:
         config = yaml.safe_load(ymlfile)
 
+    # Setup CUDA settings
     torch.cuda.set_device(opt.gpu_id) 
-    
     torch.backends.cudnn.deterministic = True
     random.seed(opt.random_state)
     torch.manual_seed(opt.random_state)
     torch.cuda.manual_seed(opt.random_state)
     np.random.seed(opt.random_state)
    
+    # Create useful dirs
     os.makedirs(opt.logger_name, exist_ok=True)
     os.makedirs(opt.models_output_path, exist_ok=True)
 
+    # Load required weights for feature extractor
     if opt.extractor_weights.lower() == 'imagenet':
         features_extractor = EfficientNet.from_pretrained('efficientnet-b0')
     else:
@@ -104,6 +93,7 @@ if __name__ == "__main__":
         features_extractor.load_matching_state_dict(torch.load(opt.extractor_weights, map_location=torch.device('cpu')))
         print("Custom features extractor weights loaded.")
     
+    # Init the required model
     if opt.model == 0:
         model = Baseline(config=config)
         num_patches = None
@@ -111,6 +101,7 @@ if __name__ == "__main__":
         model = SizeInvariantTimeSformer(config=config)
         num_patches = config['model']['num-patches']
 
+    # Setup the requiring grad layers for features extractor
     if opt.freeze_backbone:
         features_extractor.eval()
     else:
@@ -122,11 +113,14 @@ if __name__ == "__main__":
                         param.requires_grad = True
                     else:
                         param.requires_grad = False
+
+    # Move models to GPU 
     features_extractor = features_extractor.to(opt.gpu_id)    
     model = model.to(opt.gpu_id)
-        
     model.train()
+    
 
+    # Init optimizers
     if opt.freeze_backbone:
         parameters = model.parameters()
     else:
@@ -142,6 +136,7 @@ if __name__ == "__main__":
         print("Error: Invalid optimizer specified in the config file.")
         exit()
 
+    # Init LR schedulers
     if config['training']['scheduler'].lower() == 'steplr':   
         scheduler = lr_scheduler.StepLR(optimizer, step_size=config['training']['step-size'], gamma=config['training']['gamma'])
     elif config['training']['scheduler'].lower() == 'cosinelr':
@@ -164,9 +159,8 @@ if __name__ == "__main__":
         print("No checkpoint loaded for TimeSformer.")
 
     
-    # READ ALL PATHS
+    # Read all the paths and initialize data loaders for train and validation
     paths = []
-    # 1. Read csv of training and validation set
     col_names = ["video", "label", "8_cls"]
     
     df_train = pd.read_csv(opt.train_list_file, sep=' ', names=col_names)
@@ -204,15 +198,13 @@ if __name__ == "__main__":
     print("___________________")
 
 
-    
+    # Init logger
     tb_logger = SummaryWriter(log_dir=opt.logger_name, comment='')
     experiment_path = tb_logger.get_logdir()
     
-
     loss_fn = torch.nn.BCEWithLogitsLoss(pos_weight=torch.tensor([class_weights]))
 
-    # Create the data loaders
-    
+    # Create the data loaders 
     train_dataset = DeepFakesDataset(train_videos, train_labels, config['model']['image-size'], num_frames=config['model']['num-frames'], num_patches=num_patches, max_identities=config['model']['max-identities'])
     train_dl = torch.utils.data.DataLoader(train_dataset, batch_size=config['training']['bs'], shuffle=True, sampler=None,
                                  batch_sampler=None, num_workers=opt.workers, collate_fn=None,
@@ -232,9 +224,8 @@ if __name__ == "__main__":
     not_improved_loss = 0
     previous_loss = math.inf
 
-
     count_dict = {}
-            
+       
     for t in range(starting_epoch, opt.num_epochs + 1):
         model.train()
         if not_improved_loss == opt.patience:

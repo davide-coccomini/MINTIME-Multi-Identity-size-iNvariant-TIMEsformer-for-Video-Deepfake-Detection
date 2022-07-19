@@ -66,7 +66,6 @@ class DeepFakesDataset(Dataset):
     
     def get_sorted_identities(self, identities):
         sorted_identities = []
-    
         for identity in identities:
             if not os.path.isdir(identity):
                 continue
@@ -120,7 +119,11 @@ class DeepFakesDataset(Dataset):
             max_faces = identity[2]
             faces = np.asarray(sorted(os.listdir(identity_path), key=lambda x:int(x.split("_")[0])))
             if len(faces) > max_faces:
-                idx = np.round(np.linspace(0, len(faces) - 1, max_faces)).astype(int)
+                if index % 2:
+                    idx = np.round(np.linspace(0, len(faces) - 2, max_faces)).astype(int)
+                else:
+                    idx = np.round(np.linspace(1, len(faces) - 1, max_faces)).astype(int)
+                    
                 faces = faces[idx]
 
             identity_faces = []

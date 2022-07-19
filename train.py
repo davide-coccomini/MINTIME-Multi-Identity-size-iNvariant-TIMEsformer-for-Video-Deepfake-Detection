@@ -262,12 +262,10 @@ if __name__ == "__main__":
             positions = positions.to(opt.gpu_id)
 
             if opt.model == 0: 
-                #videos = reduce(videos, "b f h w c -> b h w c", 'mean')
-                print(videos.shape)
                 videos = rearrange(videos, "b f h w c -> (b f) c h w")
-                print(videos.shape)
                 features = features_extractor.extract_features(videos)  
                 y_pred = model(features)
+                y_pred = torch.mean(y_pred.reshape(-1, self.num_frames), axis=1)
             elif opt.model == 1: 
                 videos = rearrange(videos, 'b f h w c -> (b f) c h w')                                               # B*8 x 3 x 224 x 224
                 if opt.freeze_backbone:

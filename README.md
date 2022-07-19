@@ -208,12 +208,12 @@ The algorithm is structured as follows:
 - The distance between each face and all faces identified in the next frame is calculated;
 - Sequences are constructed identifying for each pair of consecutive frames and for each face, the best match i.e. the one with the shortest distance for that single face.
 
-![Clustering algorithm for multi-faces videos](images/clustering_deepfake.gif)
+![Clustering algorithm for multi-faces videos](images/clustering_deepfake_global.gif)
 
 
 The following parameters can be changed as desired to achieve different clustering:
 - --similarity_threshold: Threshold used to discard faces with high distance value (default 0.8);
-- --min_faces_number_per_sequence: Minimum number of faces per sequence to be considered.
+- --valid_cluster_size_ratio: Valid cluster size percentage (default: 0.2)
 
 The dataset at the end of this process will have the following structure:
 ```
@@ -269,8 +269,7 @@ The dataset at the end of this process will have the following structure:
 ```
 
 ## Training
-The training phase is divided into two distinct phases. A first phase designed to perform the end-to-end training of the proposed Size-Invariant TimeSformer using only one identity per video. 
-In the second step, an Identity Network is trained to perform the final classification for all identities of the same video from the features extracted by the model obtained in the previous step.
+After transforming each video in the dataset into temporally and spatially coherent sequences, one can move on to the training phase of the model.
 
 To download the pretrained weights of the models you can run the following commands:
 ```
@@ -285,20 +284,48 @@ wget ...
 If you are unable to use the previous urls you can download the weights from [Google Drive](https://drive.google.com/drive/folders/19bNOs8_rZ7LmPP3boDS3XvZcR1iryHR1?usp=sharing).
 
 
-
-### STEP 1: Size-Invariant TimeSformer Training
-In this phase, only one identity per video (the one with the largest size) is considered.
-The network is trained to perform pristine/fake binary classification and the multi-face case is ignored at this stage. The features are extracted from a pertrained EfficientNet B0 and the training of the TimeSformer is also influenced by the presence of an additional embedding, namely the size embedding. It is calculated from the face-frame area ratio for each face of the video and concatenated to each token obtained from it. 
-
+The network is trained to perform pristine/fake binary classification. The features are extracted from a pertrained EfficientNet B0 and the training of the TimeSformer is also influenced by the presence of an additional embedding, namely the size embedding. It is calculated from the face-frame area ratio for each face of the video and concatenated to each token obtained from it. 
 
 ![Size Invariant TimeSformer](images/size_invariant_timesformer.gif)
 
-The number of frames per video, and thus consecutive faces to be considered for classification, is set via the num-frames parameter in the configuration file. In the event that there are fewer faces in the considered identity than necessary, more empty ones are added and then a mask is used to drive the calculation of attention properly. In the case of longer sequences, however, uniform sampling is performed.
+### Masking and Sampling
+The number of frames per video, and thus consecutive faces to be considered for classification, is set via the num-frames parameter in the configuration file. In the event that there are fewer faces in the considered identity than necessary, more empty ones are added and then a mask is used to drive the calculation of attention properly. In the case of longer sequences, however, uniform sampling is performed. Like a kind of data augmentation, this uniform sampling is performed by alternating various combinations of frames as shown in figure.
 
 ![Mask Generation and Sequence Sampling](images/masking.png)
  
 
-To run the step 1 of the training process use the following commands:
+### Adaptive Input Sequence Assignment
+
+To enable the model to handle multiple identities within one video, the number of available frames is divided among the identities of the video.
+The maximum number of identities per video is set via the max-identities parameter in the configuration file.
+
+The identities are reordered according to the size of the faces within them, and the most important identities are given a higher number of frames to be exploited in the input sequence, in order to give more importance to faces that cover a larger area and are therefore likely to be more relevant in the video, as opposed to smaller faces.
+![Input Sequence Assignemnt Example 1](images/sequence_generation_0.gif)
+
+
+In the event that an identity does not have enough faces to satisfy the number of slots allocated to it, the remaining slots are inherited by the next identity. 
+![Input Sequence Assignemnt Example 2](images/sequence_generation_1.gif)
+
+
+### Temporal Coherent Positional Embedding
+Classical positional embedding was then evolved to ensure temporal consistency between frames as well as spatial consistency between tokens. 
+Tokens are numbered in such a way that two faces, of different identities but belonging to the same frame, have the same numbering. 
+Temporal coherence is maintained both locally by having an increasing numbering sequence as well as the frames from which the faces originate and globally by being generated on the basis of the global distribution of frames of all identities in the video.
+
+![Temporal Positional Embedding Example 1](images/temporal_positional_embedding_0.gif)
+
+![Temporal Positional Embedding Example 2](images/temporal_positional_embedding_1.gif)
+
+### Identity-based Attention Calculation
+Not being interested in capturing the relationships between faces of different identities, the calculation of temporal attention is carried out exclusively between faces belonging to the same identity. All faces, however, influence the CLS that is global and unique for all identities. 
+In the animation below, it is shown how attention is calculated exclusively by tokens referring to identity 0 faces (green), ignoring those referring to identity 1 faces (red) and vice versa. While all refer to the global CLS.
+![Multi-Face Identity-based Attention Calculation](images/attention_calculation_multi_face.gif)
+
+### Multi-Face Size-Invariant TimeSformer
+
+![Multi-Face Size-Invariant TimeSformer](images/multi_face_size_invariant_timesformer.gif)
+
+To run the training process use the following commands:
 ```
 python3 train.py --config config/size_invariant_timesformer.yaml --model 1 --train_list_file path/to/training_list_file.txt --validation_list_file path/to/validation_list_file.txt --extractor_weights path/to/backbone_weights
 ```
@@ -313,16 +340,6 @@ The following parameters can be changed as desired to perform different training
 - --patience: How many epochs wait before stopping for validation loss not improving (default: 5);
 - --logger_name: Path to the folder for tensorboard logging (default: runs/train);
 
-
-### STEP 2: Identity Network Training
-The Size Invariant TimeSformer trained in the previous step is then used as a feature extractor to train an Identity Network that will perform classification based on the features extracted from all identities in the video. This further step is necessary to exploit multi-faces videos effectively.
-
-![Identity Network](images/identity_network.gif)
-
-To run the step 2 of the training process use the following commands:
-```
-python3 train.py --config config/identity_network.yaml --model 2 --train_list_file path/to/training_list_file.txt --validation_list_file path/to/validation_list_file.txt --extractor_weights path/to/backbone_weights
-```
 
 ## Evaluation
 TODO

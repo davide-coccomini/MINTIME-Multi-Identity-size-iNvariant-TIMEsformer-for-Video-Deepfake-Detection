@@ -62,36 +62,49 @@ class DeepFakesDataset(Dataset):
             PadIfNeeded(min_height=size, min_width=size, border_mode=cv2.BORDER_CONSTANT),
         ])
 
+    # Input the identity path and return a row with path, size and number of faces available
+    def get_identity_information(self, identity):
+        faces = os.listdir(identity)
+        t = magic.from_file(os.path.join(identity, faces[0]))
+        shape = re.search('(\d+) x (\d+)', t).groups()
+        max_side = int(shape[0])
+        number_of_faces = len(faces)
+        return [identity, max_side, number_of_faces]
 
-    
-    def get_sorted_identities(self, identities):
+
+    # Returns the identities, size-based sorted, with the number of faces for each identity to be readed
+    def get_sorted_identities(self, video_path):
+        identities = [os.path.join(video_path, identity) for identity in os.path.listdir(video_path)]
         sorted_identities = []
+        discarded_faces = []
         for identity in identities:
-            if not os.path.isdir(identity):
+            if not os.path.isdir(identity): # The faces are not inside an identity folder but we save them to fill temporal wholes in identities if occurs
+                discarded_faces.append(identity)
                 continue
             
-            faces = sorted(os.listdir(identity), key=lambda x:int(x.split("_")[0]))
-            t = magic.from_file(os.path.join(identity, faces[0]))
-            shape = re.search('(\d+) x (\d+)', t).groups()
-            max_side = int(shape[0])
-            number_of_faces = len(faces)
-            sorted_identities.append([identity, max_side, number_of_faces])
+            # Sort faces based on temporal order
+            sorted_identities.append(self.get_identity_information(identity))
 
+        # If no faces have been found, use the discarded faces
+        if len(sorted_identities) == 0:
+            sorted_identities.append(self.get_identity_information(os.path.dirname(discarded_faces[0])))
+            discarded_faces = []
 
+        # Sort identities based on faces size
         sorted_identities = sorted(sorted_identities, key=lambda x:x[1], reverse=True)
         if len(sorted_identities) > self.max_identities:
             sorted_identities = sorted_identities[:self.max_identities]
 
+        # Adjust the identities list faces number
         identities_number = len(sorted_identities)
         if identities_number > 1:
             max_faces_per_identity = self.max_faces_per_identity[identities_number]
-            # Adjust the list
             for i in range(identities_number):
                 if sorted_identities[i][2] < max_faces_per_identity[i] and i < identities_number - 1:
                     sorted_identities[i+1][2] += max_faces_per_identity[i] - sorted_identities[i][2] 
                 elif sorted_identities[i][2] > max_faces_per_identity[i]:
                     sorted_identities[i][2] = max_faces_per_identity[i]
-        else:
+        else: # If only one identity is in the video, all the frames are assigned to this identity
             sorted_identities[0][2] = self.num_frames
 
         return sorted_identities
@@ -106,8 +119,7 @@ class DeepFakesDataset(Dataset):
             transform = self.create_val_transform(self.image_size)   
 
         original_video_path = os.path.join(ORIGINAL_VIDEOS_PATH[self.mode], video_path.split(self.mode + os.path.sep)[1])
-        identities = os.listdir(video_path)
-        identities = self.get_sorted_identities([os.path.join(video_path, identity) for identity in identities])
+        identities, discarded_faces = self.get_sorted_identities(video_path)
         mask = []
         last_range_end = 0
         sequence = []
@@ -117,7 +129,19 @@ class DeepFakesDataset(Dataset):
         for identity_index, identity in enumerate(identities):
             identity_path = identity[0]
             max_faces = identity[2]
-            faces = np.asarray(sorted(os.listdir(identity_path), key=lambda x:int(x.split("_")[0])))
+            faces = os.listdir(identity_path)
+
+            # If no faces were considered for a frame during clustering, probably it is inside the discarded faces
+            if identity_index == 0 and len(discarded_faces) > 0:
+                frames = [int(os.path.basename(image_path).split("_")[0]) for image_path in faces]
+                discarded_frames = [int(os.path.basename(image_path).split("_")[0]) for image_path in discarded_faces]
+                missing_elements = discarded_faces.index(list(set(frames) - set(discarded_frames)))
+                if len(missing_elements) > 0:
+                    faces = faces + missing_elements # Add the missing faces to the identity
+
+            faces = np.asarray(faces, key=lambda x:int(x.split("_")[0]))
+            
+            # Select uniformly the frames in an alternate way
             if len(faces) > max_faces:
                 if index % 2:
                     idx = np.round(np.linspace(0, len(faces) - 2, max_faces)).astype(int)
@@ -126,13 +150,15 @@ class DeepFakesDataset(Dataset):
                     
                 faces = faces[idx]
 
+            # Convert from identity_path to face_path
             identity_faces = []
             for face in faces:
                 face_path = os.path.join(identity_path, face)
                 identity_faces.append(face_path)
 
+
+            # Read all images files
             identity_images = []
-            
             capture = cv2.VideoCapture(original_video_path)
             width  = capture.get(3)  
             height = capture.get(4) 
@@ -140,29 +166,40 @@ class DeepFakesDataset(Dataset):
             identity_size_embeddings = []
             for image_path in identity_faces:
                 image = np.asarray(Image.open(image_path))
+
+                # Get face-frame area ratio for size embedding
                 face_area = image.shape[0] * image.shape[1] / 2
                 ratio = int(face_area * 100 / video_area)
-                
                 side_ranges = list(map(lambda a_: ratio in range(a_[0], a_[1] + 1), SIZE_EMB_DICT))
                 identity_size_embeddings.append(np.where(side_ranges)[0][0]+1)
+
+                # Transform image for data augmentation, the transformation is the same for all the faces of the same video
                 try:
                     image = transform(image=image)['image']
                 except:
                     image = np.zeros((self.image_size, self.image_size, 3))
+
+                # Read the frame number associated with the image in order to generate the correct temporal-positional embedding
                 frame = int(os.path.basename(image_path).split("_")[0])
                 images_frames.append(frame)
+
+                # Append the image to the list of readed images
                 identity_images.append(image)
-            if len(identity_images) < max_faces: # The faces are less than max_faces so we need to add empty images
+
+            # If the readed faces are less than max_faces we need to add empty images and generate the mask
+            if len(identity_images) < max_faces: 
                 diff = max_faces - len(identity_size_embeddings)
                 identity_size_embeddings = np.concatenate((identity_size_embeddings, np.zeros(diff)))
                 identity_images = np.concatenate((identity_images, np.zeros((diff, self.image_size, self.image_size, 3), dtype=np.double)))
                 mask.extend([1 if i < max_faces - diff else 0 for i in range(max_faces)])
             else: # Otherwise all the faces are valid
                 mask.extend([1 for i in range(max_faces)])
+
+            # Compose the size_embedding and sequence list
             size_embeddings.extend(identity_size_embeddings)
             sequence.extend(identity_images)
 
-
+        # Generate the identities_mask telling to the model which faces attend to an identity and which to another one
         identities_mask = []
         last_range_end = 0
         for identity_index in range(len(identities)):
@@ -180,6 +217,7 @@ class DeepFakesDataset(Dataset):
             positions.insert(0,0) # Add CLS
         else:
             positions = []
+
         return torch.tensor(sequence).float(), torch.tensor(size_embeddings).int(), torch.tensor(mask).bool(), torch.tensor(identities_mask).bool(), torch.tensor(positions), self.y[index]
 
     def __len__(self):

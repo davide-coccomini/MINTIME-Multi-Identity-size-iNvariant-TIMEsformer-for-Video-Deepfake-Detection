@@ -21,6 +21,7 @@ from os import cpu_count
 import re
 import cv2
 from itertools import compress
+from statistics import mean
 
 
 ORIGINAL_VIDEOS_PATH = {"train": "../datasets/ForgeryNet/Training/video/train_video_release", "val": "../datasets/ForgeryNet/Training/video/train_video_release", "test": "../datasets/ForgeryNet/Validation/video/val_video_release"}
@@ -73,14 +74,14 @@ class DeepFakesDataset(Dataset):
     # Input the identity path and return a row with path, size and number of faces available
     def get_identity_information(self, identity):
         faces = [os.path.join(identity, face) for face in os.listdir(identity)]
-        mean_side = mean([re.search('(\d+) x (\d+)', magic.from_file(face)).groups()[0] for face in faces])
+        mean_side = mean([int(re.search('(\d+) x (\d+)', magic.from_file(face)).groups()[0]) for face in faces])
         number_of_faces = len(faces)
         return [identity, mean_side, number_of_faces]
 
 
     # Returns the identities, size-based sorted, with the number of faces for each identity to be readed
     def get_sorted_identities(self, video_path):
-        identities = [os.path.join(video_path, identity) for identity in os.path.listdir(video_path)]
+        identities = [os.path.join(video_path, identity) for identity in os.listdir(video_path)]
         sorted_identities = []
         discarded_faces = []
         for identity in identities:
@@ -113,27 +114,30 @@ class DeepFakesDataset(Dataset):
                 elif sorted_identities[i][2] > max_faces_per_identity[i]:
                     available_additional_faces.append(sorted_identities[i][2] - max_faces_per_identity[i])
                     sorted_identities[i][2] = max_faces_per_identity[i]
+                else:
+                    available_additional_faces.append(0)
 
         else: # If only one identity is in the video, all the frames are assigned to this identity
             sorted_identities[0][2] = self.num_frames
+            available_additional_faces.append(0)
 
         # Check if we found enough faces to fullfill the input sequence, otherwise go back and add some faces from previous identities
         input_sequence_length = sum(faces for _, _, faces in sorted_identities)
         if input_sequence_length < self.num_frames:
-            needed_faces = self.num_frames - input_sequence_length
             for i in range(identities_number):
+                needed_faces = self.num_frames - input_sequence_length
                 if available_additional_faces[i] > 0:
                     added_faces = min(available_additional_faces[i], needed_faces)
                     sorted_identities[i][2] += added_faces
                     input_sequence_length += added_faces
                     if input_sequence_length == self.num_frames:
                         break
-        
-
-
-            
-
-        return sorted_identities
+            # If not enough faces have been found, add some "dummy" images in the last identity
+            if input_sequence_length < self.num_frames:
+                needed_faces = self.num_frames - input_sequence_length
+                sorted_identities[-1][2] += needed_faces
+                input_sequence_length += needed_faces
+        return sorted_identities, discarded_faces
     
 
     def __getitem__(self, index):
@@ -155,32 +159,28 @@ class DeepFakesDataset(Dataset):
         for identity_index, identity in enumerate(identities):
             identity_path = identity[0]
             max_faces = identity[2]
-            faces = os.listdir(identity_path)
+            identity_faces = [os.path.join(identity_path, face) for face in os.listdir(identity_path)]
 
             # If no faces were considered for a frame during clustering, probably it is inside the discarded faces
             if identity_index == 0 and len(discarded_faces) > 0:
-                frames = [int(os.path.basename(image_path).split("_")[0]) for image_path in faces]
+                frames = [int(os.path.basename(image_path).split("_")[0]) for image_path in identity_faces]
                 discarded_frames = [int(os.path.basename(image_path).split("_")[0]) for image_path in discarded_faces]
-                missing_elements = discarded_faces.index(list(set(frames) - set(discarded_frames)))
-                if len(missing_elements) > 0:
-                    faces = faces + missing_elements # Add the missing faces to the identity
+                missing_frames = list(set(discarded_frames) - set(frames))
+                missing_faces = [discarded_faces[discarded_frames.index(missing_frame)] for missing_frame in missing_frames]
+                
+                if len(missing_faces) > 0:
+                    identity_faces = identity_faces + missing_faces # Add the missing faces to the identity
 
-            faces = np.asarray(faces, key=lambda x:int(x.split("_")[0]))
+            identity_faces = np.asarray(sorted(identity_faces, key=lambda x:int(os.path.basename(x).split("_")[0])))
             
             # Select uniformly the frames in an alternate way
-            if len(faces) > max_faces:
+            if len(identity_faces) > max_faces:
                 if index % 2:
-                    idx = np.round(np.linspace(0, len(faces) - 2, max_faces)).astype(int)
+                    idx = np.round(np.linspace(0, len(identity_faces) - 2, max_faces)).astype(int)
                 else:
-                    idx = np.round(np.linspace(1, len(faces) - 1, max_faces)).astype(int)
+                    idx = np.round(np.linspace(1, len(identity_faces) - 1, max_faces)).astype(int)
                     
-                faces = faces[idx]
-
-            # Convert from identity_path to face_path
-            identity_faces = []
-            for face in faces:
-                face_path = os.path.join(identity_path, face)
-                identity_faces.append(face_path)
+                identity_faces = identity_faces[idx]
 
             # Read all images files
             identity_images = []
@@ -190,6 +190,7 @@ class DeepFakesDataset(Dataset):
             video_area = width*height/2
             identity_size_embeddings = []
             for image_path in identity_faces:
+                # Read face image
                 image = np.asarray(Image.open(image_path))
 
                 # Get face-frame area ratio for size embedding
@@ -217,6 +218,7 @@ class DeepFakesDataset(Dataset):
                 identity_size_embeddings = np.concatenate((identity_size_embeddings, np.zeros(diff)))
                 identity_images = np.concatenate((identity_images, np.zeros((diff, self.image_size, self.image_size, 3), dtype=np.double)))
                 mask.extend([1 if i < max_faces - diff else 0 for i in range(max_faces)])
+                images_frames.extend([max(images_frames) for i in range(diff)])
             else: # Otherwise all the faces are valid
                 mask.extend([1 for i in range(max_faces)])
 
@@ -232,17 +234,17 @@ class DeepFakesDataset(Dataset):
             for k in range(identities[identity_index][2]):
                 identities_mask.append(identity_mask)
             last_range_end += identities[identity_index][2]
-        
+
         # Generate coherent temporal-positional embedding
         images_frames_positions = {k: v+1 for v, k in enumerate(sorted(set(images_frames)))}
-        frame_positions = [images_frames_positions[frame] for frame in images_frames]     
+        frame_positions = [images_frames_positions[frame] for frame in images_frames]   
         if self.num_patches != None: 
             positions = [[i+1 for i in range(((frame_position-1)*self.num_patches), self.num_patches*(frame_position))] for frame_position in frame_positions]
             positions = sum(positions, []) # Merge the lists
             positions.insert(0,0) # Add CLS
         else:
             positions = []
-
+        
         return torch.tensor(sequence).float(), torch.tensor(size_embeddings).int(), torch.tensor(mask).bool(), torch.tensor(identities_mask).bool(), torch.tensor(positions), self.y[index]
 
     def __len__(self):

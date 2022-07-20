@@ -208,15 +208,15 @@ if __name__ == "__main__":
     loss_fn = torch.nn.BCEWithLogitsLoss(pos_weight=torch.tensor([class_weights]))
 
     # Create the data loaders 
-    train_dataset = DeepFakesDataset(train_videos, train_labels, config['model']['image-size'], num_frames=config['model']['num-frames'], num_patches=num_patches, max_identities=config['model']['max-identities'])
-    train_dl = torch.utils.data.DataLoader(train_dataset, batch_size=config['training']['bs'], data_path=opt.data_path, shuffle=True, sampler=None,
+    train_dataset = DeepFakesDataset(train_videos, train_labels, image_size=config['model']['image-size'], data_path=opt.data_path, num_frames=config['model']['num-frames'], num_patches=num_patches, max_identities=config['model']['max-identities'])
+    train_dl = torch.utils.data.DataLoader(train_dataset, batch_size=config['training']['bs'], shuffle=True, sampler=None,
                                  batch_sampler=None, num_workers=opt.workers, collate_fn=None,
                                  pin_memory=False, drop_last=False, timeout=0,
                                  worker_init_fn=None, prefetch_factor=2,
                                  persistent_workers=False)
 
-    validation_dataset = DeepFakesDataset(validation_videos, validation_labels, config['model']['image-size'], num_frames=config['model']['num-frames'], num_patches=num_patches, max_identities=config['model']['max-identities'], mode='val')
-    val_dl = torch.utils.data.DataLoader(validation_dataset, batch_size=config['training']['val_bs'], data_path=opt.data_path, shuffle=True, sampler=None,
+    validation_dataset = DeepFakesDataset(validation_videos, validation_labels, image_size=config['model']['image-size'], data_path=opt.data_path, num_frames=config['model']['num-frames'], num_patches=num_patches, max_identities=config['model']['max-identities'], mode='val')
+    val_dl = torch.utils.data.DataLoader(validation_dataset, batch_size=config['training']['val_bs'], shuffle=True, sampler=None,
                                     batch_sampler=None, num_workers=opt.workers, collate_fn=None,
                                     pin_memory=False, drop_last=False, timeout=0,
                                     worker_init_fn=None, prefetch_factor=2,
@@ -291,11 +291,12 @@ if __name__ == "__main__":
 
             # Update time per epoch
             time_diff = datetime.now()-start_time
+            print(time_diff)
             duration = float(str(time_diff.seconds) + "." +str(time_diff.microseconds))
             times_per_batch += duration
             
             # Print intermediate metrics
-            if index%100 == 0:
+            if index%1 == 0:
                 expected_time = str(timedelta(seconds=(times_per_batch / (index+1))*total_batches-index))
                 print("\nLoss: ", total_loss/counter, "Accuracy: ", train_correct/(counter*config['training']['bs']) ,"Train 0s: ", negative, "Train 1s:", positive, "Expected Time:", expected_time)
 

@@ -1,8 +1,8 @@
 training:
   lr: 1.0e-5
   weight-decay: 0.0001
-  bs: 48
-  val_bs: 48
+  bs: 8
+  val_bs: 8
   optimizer: 'AdamW'
   scheduler: 'cosinelr' 
   gamma: 0.1
@@ -14,10 +14,10 @@ model:
   patch-size: 1
   num-classes: 1
   num-patches: 49
-  num-frames: 8
+  num-frames: 16
   max-identities: 2
-  dim: 256
-  depth: 4
+  dim: 512
+  depth: 6
   dim-head: 64
   channels: 1280
   heads: 8

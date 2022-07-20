@@ -319,7 +319,8 @@ Temporal coherence is maintained both locally by having an increasing numbering 
 ### Identity-based Attention Calculation
 Not being interested in capturing the relationships between faces of different identities, the calculation of temporal attention is carried out exclusively between faces belonging to the same identity. All faces, however, influence the CLS that is global and unique for all identities. 
 In the animation below, it is shown how attention is calculated exclusively by tokens referring to identity 0 faces (green), ignoring those referring to identity 1 faces (red) and vice versa. While all refer to the global CLS.
-![Multi-Face Identity-based Attention Calculation](images/attention_calculation_multi_face.gif)
+
+![Multi-Face Identity-based Attention Calculation](images/attention_calculations_multi_face.gif)
 
 ### Multi-Face Size-Invariant TimeSformer
 

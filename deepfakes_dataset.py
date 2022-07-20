@@ -105,15 +105,35 @@ class DeepFakesDataset(Dataset):
 
         # Adjust the identities list faces number
         identities_number = len(sorted_identities)
+        available_additional_faces = []
         if identities_number > 1:
             max_faces_per_identity = self.max_faces_per_identity[identities_number]
             for i in range(identities_number):
                 if sorted_identities[i][2] < max_faces_per_identity[i] and i < identities_number - 1:
                     sorted_identities[i+1][2] += max_faces_per_identity[i] - sorted_identities[i][2] 
+                    available_additional_faces.append(0)
                 elif sorted_identities[i][2] > max_faces_per_identity[i]:
+                    available_additional_faces.append(sorted_identities[i][2] - max_faces_per_identity[i])
                     sorted_identities[i][2] = max_faces_per_identity[i]
+
         else: # If only one identity is in the video, all the frames are assigned to this identity
             sorted_identities[0][2] = self.num_frames
+
+        # Check if we found enough faces to fullfill the input sequence, otherwise go back and add some faces from previous identities
+        input_sequence_length = sum(faces for _, _, faces in sorted_identities)
+        if input_sequence_length < self.num_frames:
+            needed_faces = self.num_frames - input_sequence_length
+            for i in range(identities_number):
+                if available_additional_faces[i] > 0:
+                    added_faces = min(available_additional_faces[i], needed_faces)
+                    sorted_identities[i][2] += added_faces
+                    input_sequence_length += added_faces
+                    if input_sequence_length == self.num_frames:
+                        break
+        
+
+
+            
 
         return sorted_identities
     

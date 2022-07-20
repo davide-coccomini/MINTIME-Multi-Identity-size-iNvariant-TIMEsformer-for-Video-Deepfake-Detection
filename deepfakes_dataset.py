@@ -23,15 +23,15 @@ import cv2
 from itertools import compress
 
 
-DATA_DIR = "../datasets/ForgeryNet/faces_test"
 ORIGINAL_VIDEOS_PATH = {"train": "../datasets/ForgeryNet/Training/video/train_video_release", "val": "../datasets/ForgeryNet/Training/video/train_video_release", "test": "../datasets/ForgeryNet/Validation/video/val_video_release"}
 RANGE_SIZE = 5
 SIZE_EMB_DICT = [(1+i*RANGE_SIZE, (i+1)*RANGE_SIZE) if i != 0 else (0, RANGE_SIZE) for i in range(20)]
 
 class DeepFakesDataset(Dataset):
-    def __init__(self, videos_paths, labels, image_size, mode = 'train', model = 0, num_frames = 8, max_identities = 3, num_patches=49):
+    def __init__(self, videos_paths, labels, data_path, image_size, mode = 'train', model = 0, num_frames = 8, max_identities = 3, num_patches=49):
         self.x = videos_paths
         self.y = labels
+        self.data_path = data_path
         self.image_size = image_size
         self.mode = mode
         self.n_samples = len(videos_paths)
@@ -120,7 +120,7 @@ class DeepFakesDataset(Dataset):
 
     def __getitem__(self, index):
         video_path = self.x[index]
-        video_path = os.path.join(DATA_DIR, video_path)
+        video_path = os.path.join(self.data_path, video_path)
         if self.mode == 'train':
             transform = self.create_train_transforms(self.image_size)
         else:
@@ -163,7 +163,6 @@ class DeepFakesDataset(Dataset):
             for face in faces:
                 face_path = os.path.join(identity_path, face)
                 identity_faces.append(face_path)
-
 
             # Read all images files
             identity_images = []

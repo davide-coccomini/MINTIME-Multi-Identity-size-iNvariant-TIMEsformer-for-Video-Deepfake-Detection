@@ -39,7 +39,9 @@ if __name__ == "__main__":
     parser.add_argument('--train_list_file', default="../datasets/ForgeryNet/faces/train.csv", type=str,
                         help='Training List txt file path)')
     parser.add_argument('--validation_list_file', default="../datasets/ForgeryNet/faces/val.csv", type=str,
-                        help='Validation List txt file path)')
+                        help='Validation List txt file path)')  
+    parser.add_argument('--data_path', default="../datasets/ForgeryNet/faces", type=str,
+                        help='Path to the dataset converted into identities')
     parser.add_argument('--num_epochs', default=30, type=int,
                         help='Number of training epochs.')
     parser.add_argument('--workers', default=8, type=int,
@@ -207,14 +209,14 @@ if __name__ == "__main__":
 
     # Create the data loaders 
     train_dataset = DeepFakesDataset(train_videos, train_labels, config['model']['image-size'], num_frames=config['model']['num-frames'], num_patches=num_patches, max_identities=config['model']['max-identities'])
-    train_dl = torch.utils.data.DataLoader(train_dataset, batch_size=config['training']['bs'], shuffle=True, sampler=None,
+    train_dl = torch.utils.data.DataLoader(train_dataset, batch_size=config['training']['bs'], data_path=opt.data_path, shuffle=True, sampler=None,
                                  batch_sampler=None, num_workers=opt.workers, collate_fn=None,
                                  pin_memory=False, drop_last=False, timeout=0,
                                  worker_init_fn=None, prefetch_factor=2,
                                  persistent_workers=False)
 
     validation_dataset = DeepFakesDataset(validation_videos, validation_labels, config['model']['image-size'], num_frames=config['model']['num-frames'], num_patches=num_patches, max_identities=config['model']['max-identities'], mode='val')
-    val_dl = torch.utils.data.DataLoader(validation_dataset, batch_size=config['training']['val_bs'], shuffle=True, sampler=None,
+    val_dl = torch.utils.data.DataLoader(validation_dataset, batch_size=config['training']['val_bs'], data_path=opt.data_path, shuffle=True, sampler=None,
                                     batch_sampler=None, num_workers=opt.workers, collate_fn=None,
                                     pin_memory=False, drop_last=False, timeout=0,
                                     worker_init_fn=None, prefetch_factor=2,

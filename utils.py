@@ -1,21 +1,9 @@
+# Utility functions for training process
+
 import numpy as np
 import torch
 
-def get_n_params(model):
-    pp=0
-    for p in list(model.parameters()):
-        nn=1
-        for s in list(p.size()):
-            nn = nn*s
-        pp += nn
-    return 
-    
-def shuffle_dataset(dataset):
-  import random
-  random.seed(41)
-  random.shuffle(dataset)
-  return dataset
-
+# Convert the preds into final video-level prediction
 def check_correct(preds, labels):
     preds = [np.asarray(torch.sigmoid(pred).detach().numpy()).round() for pred in preds]
 

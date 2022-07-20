@@ -1,3 +1,11 @@
+# DeepFakesDataset class used for data loading
+# In this step the identities are also refined and organized in order to fit into the available number of frames per video. 
+# The data augmentation is also applied to each face extracted from the video and several embeddings and masks are generated:
+# 1. The Size Embedding, responsible to induct the information about face-frame area ratio of each face to the model. 
+# 2. The Temporal Positional Embedding, responsible to maintain a coherent spatial and temporal positional information of the input tokens
+# 3. The Mask, responsible to make the model ignore the "empty faces" added to fill wholes in the input sequence, if occur
+# 4. The Identity Mask, used to tell the model each face to which identity it corresponds
+
 import torch
 from torch.utils.data import DataLoader, TensorDataset, Dataset
 import cv2 

@@ -1,11 +1,12 @@
+# The training process is conducted using this code and it can be customized on the specific model that you want to train.
+
 import torch
 import numpy as np
 import argparse
 from tqdm import tqdm
 import math
 import yaml
-from utils import get_n_params, check_correct
-from sklearn.utils.class_weight import compute_class_weight 
+from utils import check_correct
 from torch.optim.lr_scheduler import LambdaLR
 from datetime import datetime, timedelta
 from statistics import mean
@@ -219,23 +220,20 @@ if __name__ == "__main__":
                                     worker_init_fn=None, prefetch_factor=2,
                                     persistent_workers=False)
    
-
-    counter = 0
+    # Init variables for training
     not_improved_loss = 0
     previous_loss = math.inf
-
-    count_dict = {}
        
+    # Training loop
     for t in range(starting_epoch, opt.num_epochs + 1):
         model.train()
         if not_improved_loss == opt.patience:
             break
-        counter = 0
 
+        # Init epoch variables
+        counter = 0
         total_loss = 0
         total_val_loss = 0
-        
-        bar = ChargingBar('EPOCH #' + str(t), max=(len(train_dl)+len(val_dl)))
         train_correct = 0
         positive = 0
         negative = 0
@@ -243,6 +241,9 @@ if __name__ == "__main__":
         train_batches = len(train_dl)
         val_batches = len(val_dl)
         total_batches = train_batches + val_batches
+
+        # Epoch loop
+        bar = ChargingBar('EPOCH #' + str(t), max=(len(train_dl)+len(val_dl)))
         for index, (videos, size_embeddings, masks, identities_masks, positions, labels) in enumerate(train_dl):
             start_time = datetime.now()
             b, f, h, w, c = videos.shape
@@ -252,12 +253,12 @@ if __name__ == "__main__":
             masks = masks.to(opt.gpu_id)
             positions = positions.to(opt.gpu_id)
 
-            if opt.model == 0: 
+            if opt.model == 0: # Baseline
                 videos = rearrange(videos, "b f h w c -> (b f) c h w")
                 features = features_extractor.extract_features(videos)  
                 y_pred = model(features)
                 y_pred = torch.mean(y_pred.reshape(-1, self.num_frames), axis=1)
-            elif opt.model == 1: 
+            elif opt.model == 1: # Size-Invariant TimeSformer
                 videos = rearrange(videos, 'b f h w c -> (b f) c h w')                                               # B*8 x 3 x 224 x 224
                 if opt.freeze_backbone:
                     with torch.no_grad():
@@ -268,7 +269,7 @@ if __name__ == "__main__":
                 features = rearrange(features, '(b f) c h w -> b f c h w', b = b, f = f)
                 y_pred = model(features, mask=masks, size_embedding=size_embeddings, identities_mask=identities_masks, positions=positions)
         
-
+            # Calculate loss
             videos = videos.cpu()
             y_pred = y_pred.cpu()
             loss = loss_fn(y_pred, labels)
@@ -276,27 +277,30 @@ if __name__ == "__main__":
             train_correct += corrects
             positive += positive_class
             negative += negative_class
-            optimizer.zero_grad()
-       
-            loss.backward()
-
-            optimizer.step()
-
             counter += 1
             total_loss += round(loss.item(), 2)
+        
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
             
             if config['training']['scheduler'].lower() == 'cosinelr':
                 lr_scheduler.step_update((t * (train_batches) + index))
 
+            # Update time per epoch
             time_diff = datetime.now()-start_time
             duration = float(str(time_diff.seconds) + "." +str(time_diff.microseconds))
             times_per_batch += duration
-            if index%100 == 0: # Intermediate metrics print
+            
+            # Print intermediate metrics
+            if index%100 == 0:
                 expected_time = str(timedelta(seconds=(times_per_batch / (index+1))*total_batches-index))
                 print("\nLoss: ", total_loss/counter, "Accuracy: ", train_correct/(counter*config['training']['bs']) ,"Train 0s: ", negative, "Train 1s:", positive, "Expected Time:", expected_time)
 
 
             bar.next()
+        
+        # Clean variables before moving into validation
         torch.cuda.empty_cache() 
         val_correct = 0
         val_positive = 0
@@ -305,6 +309,8 @@ if __name__ == "__main__":
         train_correct /= train_samples
         total_loss /= counter
         model.eval()
+
+        # Epoch validation loop
         for index, (videos, size_embeddings, masks, identities_masks, positions, labels) in enumerate(val_dl):
             b, f, _, _, _= videos.shape
             videos = videos.to(opt.gpu_id)
@@ -312,9 +318,9 @@ if __name__ == "__main__":
             positions = positions.to(opt.gpu_id)
             identities_masks = identities_masks.to(opt.gpu_id)
             labels = labels.unsqueeze(1).float()
+
+            # Do not update the gradient during validation
             with torch.no_grad():
-
-
                 if opt.model == 0: 
                     videos = reduce(videos, "b f h w c -> b h w c", 'mean')
                     videos = rearrange(videos, "b h w c -> b c h w")
@@ -340,37 +346,34 @@ if __name__ == "__main__":
         if config['training']['scheduler'].lower() == 'steplr':
             scheduler.step()
 
+
         torch.cuda.empty_cache() 
-
-        
-
         bar.finish()
             
-        
         total_val_loss /= val_counter
         val_correct /= validation_samples
+
         if previous_loss <= total_val_loss:
             print("Validation loss did not improved")
             not_improved_loss += 1
         else:
             not_improved_loss = 0
-        
-        
+
+        previous_loss = total_val_loss
+
+        # Save checkpoint if the model's validation loss is improving
         if previous_loss > total_val_loss:
             torch.save(features_extractor.state_dict(), os.path.join(opt.models_output_path,  "EfficientNetExtractor_checkpoint" + str(t)))
             torch.save(model.state_dict(), os.path.join(opt.models_output_path,  "SizeInvariantTimeSformer_checkpoint" + str(t)))
 
-
-   
+        # Log some metrics into Tensorboard
         tb_logger.add_scalar("Training/Accuracy", train_correct, t)
         tb_logger.add_scalar("Training/Loss", total_loss, t)
         tb_logger.add_scalar("Training/Learning_Rate", optimizer.param_groups[0]['lr'], t)
         tb_logger.add_scalar("Validation/Loss", total_val_loss, t)
         tb_logger.add_scalar("Validation/Accuracy", val_correct, t)
 
-
-        previous_loss = total_val_loss
-            
+        # Print epoch metrics            
         print("#" + str(t) + "/" + str(opt.num_epochs) + " loss:" +
             str(total_loss) + " accuracy:" + str(train_correct) +" val_loss:" + str(total_val_loss) + " val_accuracy:" + str(val_correct) + " val_0s:" + str(val_negative) + "/" + str(val_counters[0]) + " val_1s:" + str(val_positive) + "/" + str(val_counters[1]))
     

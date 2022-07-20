@@ -34,9 +34,9 @@ if __name__ == '__main__':
                         help='Path of folder containing train/val/test with extracted cropped faces to be clustered.')
     parser.add_argument('--gpu_id', default=0, type=int,
                         help='ID of GPU to be used.')
-    parser.add_argument('--similarity_threshold', default=0.55, type=float,
+    parser.add_argument('--similarity_threshold', default=0.45, type=float,
                         help='Threshold to discard faces with high distance.')
-    parser.add_argument('--valid_cluster_size_ratio', default=0.2, type=int,
+    parser.add_argument('--valid_cluster_size_ratio', default=0.20, type=int,
                         help='Valid cluster size ratio.')
     parser.add_argument('--workers', default=40, type=int,
                         help='Number of data loader workers.')

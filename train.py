@@ -291,12 +291,11 @@ if __name__ == "__main__":
 
             # Update time per epoch
             time_diff = datetime.now()-start_time
-            print(time_diff)
             duration = float(str(time_diff.seconds) + "." +str(time_diff.microseconds))
             times_per_batch += duration
             
             # Print intermediate metrics
-            if index%1 == 0:
+            if index%100 == 0:
                 expected_time = str(timedelta(seconds=(times_per_batch / (index+1))*total_batches-index))
                 print("\nLoss: ", total_loss/counter, "Accuracy: ", train_correct/(counter*config['training']['bs']) ,"Train 0s: ", negative, "Train 1s:", positive, "Expected Time:", expected_time)
 

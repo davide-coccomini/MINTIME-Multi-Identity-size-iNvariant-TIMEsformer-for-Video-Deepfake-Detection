@@ -72,12 +72,10 @@ class DeepFakesDataset(Dataset):
 
     # Input the identity path and return a row with path, size and number of faces available
     def get_identity_information(self, identity):
-        faces = os.listdir(identity)
-        t = magic.from_file(os.path.join(identity, faces[0]))
-        shape = re.search('(\d+) x (\d+)', t).groups()
-        max_side = int(shape[0])
+        faces = [os.path.join(identity, face) for face in os.listdir(identity)]
+        mean_side = mean([re.search('(\d+) x (\d+)', magic.from_file(face)).groups()[0] for face in faces])
         number_of_faces = len(faces)
-        return [identity, max_side, number_of_faces]
+        return [identity, mean_side, number_of_faces]
 
 
     # Returns the identities, size-based sorted, with the number of faces for each identity to be readed

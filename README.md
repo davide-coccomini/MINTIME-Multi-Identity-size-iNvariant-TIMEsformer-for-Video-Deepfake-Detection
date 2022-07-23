@@ -1,4 +1,4 @@
-# Size Invariant Multi-Identity Transformer-based Architecture for Video Deepfake Detection using Space-Time Attention
+# MINTIME-DF Multi-Identity size-iNvariant TIMEsformer for Video Deepfake Detection
 
 ![Header](images/faces.png)
 ## Motivations behind this study

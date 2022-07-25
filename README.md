@@ -209,7 +209,7 @@ The algorithm is structured as follows:
 - A graph is constructed with hard connection if the similarity is higher than the threshold;
 - Clusters are obtained based on the graph and small clusters are discarded;
 - The faces inside the clusters are temporally reordered;
-- The clusters are enumerated based on mean cluster size during data loading. 
+- The clusters are enumerated based on mean faces size during data loading. 
 
 ![Clustering algorithm for multi-faces videos](images/clustering_deepfake_global.gif)
 

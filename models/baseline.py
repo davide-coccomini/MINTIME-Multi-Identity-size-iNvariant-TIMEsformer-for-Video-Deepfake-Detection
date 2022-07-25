@@ -26,7 +26,7 @@ class Baseline(nn.Module):
             nn.Linear(self.dim, self.mlp_dim),
             nn.Linear(self.mlp_dim, self.num_classes)
         )
-        
+    
         for index, (name, param) in enumerate(self.mlp_head.named_parameters()):
             param.requires_grad = True
 

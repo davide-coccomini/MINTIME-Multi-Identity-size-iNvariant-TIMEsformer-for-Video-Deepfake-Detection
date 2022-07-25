@@ -324,7 +324,7 @@ In example number two, however, although the two identities have the same number
 For our TimeSformer we apply the version of attention that was most effective in the original paper, namely Divided Space-Time Attention. Attention is calculated spatially between all patches in the same frame, but is then also calculated between the corresponding patches in the next and previous frames using a moving window. 
 
 
-![Divided Space-Time Attention](images/divided_space_time_attention.jpg)
+![Divided Space-Time Attention](images/divided_space_time_attention.gif)
 
 As far as spatial attention is concerned, no further effort is required for this to be applied to our case.  
 Not being interested in capturing the relationships between faces of different identities, the calculation of temporal attention in our case is carried out exclusively between faces belonging to the same identity. All faces, however, influence the CLS that is global and unique for all identities. 

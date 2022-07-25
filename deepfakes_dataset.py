@@ -13,7 +13,7 @@ import numpy as np
 from datetime import datetime
 import os
 import magic
-from albumentations import Compose, RandomBrightnessContrast, HorizontalFlip, FancyPCA, HueSaturationValue, OneOf, ToGray, ShiftScaleRotate, ImageCompression, PadIfNeeded, GaussNoise, GaussianBlur, Rotate, Normalize
+from albumentations import Compose, RandomBrightnessContrast, HorizontalFlip, FancyPCA, HueSaturationValue, OneOf, ToGray, ShiftScaleRotate, ImageCompression, PadIfNeeded, GaussNoise, GaussianBlur, Rotate, Normalize, Resize
 from PIL import Image
 from transforms.albu import IsotropicResize
 from concurrent.futures import ThreadPoolExecutor
@@ -45,36 +45,43 @@ class DeepFakesDataset(Dataset):
                   4:  [int(num_frames/3), int(num_frames/3), int(num_frames/8), int(num_frames/8)]}
 
     
-    def create_train_transforms(self, size):
+    def create_train_transforms(self, size, additional_targets):
         return Compose([
-            Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
-            ImageCompression(quality_lower=60, quality_upper=100, p=0.2),
-            GaussNoise(p=0.3),
-            GaussianBlur(blur_limit=3, p=0.05),
-            HorizontalFlip(),
             OneOf([
                 IsotropicResize(max_side=size, interpolation_down=cv2.INTER_AREA, interpolation_up=cv2.INTER_CUBIC),
                 IsotropicResize(max_side=size, interpolation_down=cv2.INTER_AREA, interpolation_up=cv2.INTER_LINEAR),
                 IsotropicResize(max_side=size, interpolation_down=cv2.INTER_LINEAR, interpolation_up=cv2.INTER_LINEAR),
             ], p=1),
             PadIfNeeded(min_height=size, min_width=size, border_mode=cv2.BORDER_CONSTANT),
+            Resize(height=size, width=size),
+            ImageCompression(quality_lower=60, quality_upper=100, p=0.2),
+            GaussNoise(p=0.3),
+            GaussianBlur(blur_limit=3, p=0.05),
+            HorizontalFlip(),
             OneOf([RandomBrightnessContrast(), FancyPCA(), HueSaturationValue()], p=0.4),
             ToGray(p=0.2),
             ShiftScaleRotate(shift_limit=0.1, scale_limit=0.2, rotate_limit=5, border_mode=cv2.BORDER_CONSTANT, p=0.5),
-        ]
+        ], additional_targets = additional_targets
         )
         
-    def create_val_transform(self, size):
+    def create_val_transform(self, size, additional_targets):
         return Compose([
-            Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
             IsotropicResize(max_side=size, interpolation_down=cv2.INTER_AREA, interpolation_up=cv2.INTER_CUBIC),
             PadIfNeeded(min_height=size, min_width=size, border_mode=cv2.BORDER_CONSTANT),
-        ])
+            Resize(height=size, width=size)
+        ],  additional_targets = additional_targets
+        )
 
     # Input the identity path and return a row with path, size and number of faces available
     def get_identity_information(self, identity):
         faces = [os.path.join(identity, face) for face in os.listdir(identity)]
-        mean_side = mean([int(re.search('(\d+) x (\d+)', magic.from_file(face)).groups()[0]) for face in faces])
+        try:
+            mean_side = mean([int(re.search('(\d+) x (\d+)', magic.from_file(face)).groups()[0]) for face in faces])
+        except:
+            print(faces)
+            print(identity)
+            mean_side = 0
+
         number_of_faces = len(faces)
         return [identity, mean_side, number_of_faces]
 
@@ -142,12 +149,7 @@ class DeepFakesDataset(Dataset):
 
     def __getitem__(self, index):
         video_path = self.x[index]
-        video_path = os.path.join(self.data_path, video_path)
-        if self.mode == 'train':
-            transform = self.create_train_transforms(self.image_size)
-        else:
-            transform = self.create_val_transform(self.image_size)   
-
+        video_path = os.path.join(self.data_path, video_path) 
         original_video_path = os.path.join(ORIGINAL_VIDEOS_PATH[self.mode], video_path.split(self.mode + os.path.sep)[1])
         identities, discarded_faces = self.get_sorted_identities(video_path)
         mask = []
@@ -189,22 +191,17 @@ class DeepFakesDataset(Dataset):
             height = capture.get(4) 
             video_area = width*height/2
             identity_size_embeddings = []
-            for image_path in identity_faces:
+            
+            for image_index, image_path in enumerate(identity_faces):
                 # Read face image
-                image = np.asarray(Image.open(image_path))
-
+                image = cv2.imread(image_path)
+                
                 # Get face-frame area ratio for size embedding
                 face_area = image.shape[0] * image.shape[1] / 2
                 ratio = int(face_area * 100 / video_area)
                 side_ranges = list(map(lambda a_: ratio in range(a_[0], a_[1] + 1), SIZE_EMB_DICT))
                 identity_size_embeddings.append(np.where(side_ranges)[0][0]+1)
-
-                # Transform image for data augmentation, the transformation is the same for all the faces of the same video
-                try:
-                    image = transform(image=image)['image']
-                except:
-                    image = np.zeros((self.image_size, self.image_size, 3))
-
+               
                 # Read the frame number associated with the image in order to generate the correct temporal-positional embedding
                 frame = int(os.path.basename(image_path).split("_")[0])
                 images_frames.append(frame)
@@ -212,11 +209,12 @@ class DeepFakesDataset(Dataset):
                 # Append the image to the list of readed images
                 identity_images.append(image)
 
+
             # If the readed faces are less than max_faces we need to add empty images and generate the mask
             if len(identity_images) < max_faces: 
                 diff = max_faces - len(identity_size_embeddings)
                 identity_size_embeddings = np.concatenate((identity_size_embeddings, np.zeros(diff)))
-                identity_images = np.concatenate((identity_images, np.zeros((diff, self.image_size, self.image_size, 3), dtype=np.double)))
+                identity_images.extend([np.zeros((self.image_size, self.image_size, 3), dtype=np.uint8) for i in range(diff)])
                 mask.extend([1 if i < max_faces - diff else 0 for i in range(max_faces)])
                 images_frames.extend([max(images_frames) for i in range(diff)])
             else: # Otherwise all the faces are valid
@@ -226,6 +224,24 @@ class DeepFakesDataset(Dataset):
             size_embeddings.extend(identity_size_embeddings)
             sequence.extend(identity_images)
 
+        # Transform the images for data augmentation, the same transformation is applied to all the faces in the same video
+        additional_targets_keys = ["image" + str(i) for i in range(self.num_frames)]
+        additional_targets_values = ["image" for i in range(self.num_frames)]
+        additional_targets = dict(zip(additional_targets_keys, additional_targets_values))
+
+        if self.mode == 'train':
+            transform = self.create_train_transforms(self.image_size, additional_targets)
+        else:
+            transform = self.create_val_transform(self.image_size, additional_targets)  
+        if len(sequence) == 8:
+            transformed_images = transform(image=sequence[0], image1=sequence[1], image2=sequence[2], image3=sequence[3], image4=sequence[4], image5=sequence[5], image6=sequence[6], image7=sequence[7])
+        elif len(sequence) == 16:
+            transformed_images = transform(image=sequence[0], image1=sequence[1], image2=sequence[2], image3=sequence[3], image4=sequence[4], image5=sequence[5], image6=sequence[6], image7=sequence[7], image8=sequence[8], image9=sequence[9], image10=sequence[10], image11=sequence[11], image12=sequence[12], image13=sequence[13], image14=sequence[14], image15=sequence[15])
+        else:
+            raise Exception("Invalid number of frames.")
+
+        sequence = [transformed_images[key] for key in transformed_images]
+          
         # Generate the identities_mask telling to the model which faces attend to an identity and which to another one
         identities_mask = []
         last_range_end = 0

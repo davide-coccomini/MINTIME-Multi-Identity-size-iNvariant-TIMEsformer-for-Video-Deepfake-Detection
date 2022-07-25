@@ -65,7 +65,6 @@ if __name__ == '__main__':
         # For each video in each set, perform faces clustering
         bar = ChargingBar('Clustered videos', max=(len(set_paths)))
         for path in set_paths:
-            print(path)
             # Read all faces, load them into a dictionary 
             faces_files = [face_file for face_file in os.listdir(path) if not os.path.isdir(os.path.join(path, face_file))]
             faces_files = sorted(faces_files, key=lambda x:(int(x.split("_")[0]), int(os.path.splitext(x)[0].split("_")[1])))

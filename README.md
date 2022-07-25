@@ -205,8 +205,9 @@ python3 cluster_faces.py --faces_path path/to/faces
 
 The algorithm is structured as follows:
 - The features of each face are extracted via an InceptionResnetV1 pretrained on FaceNet;
-- The distance between each face and all faces identified in the next frame is calculated;
-- Sequences are constructed identifying for each pair of consecutive frames and for each face, the best match i.e. the one with the shortest distance for that single face.
+- The distance between each face and all faces identified in the video is calculated;
+- A graph is constructed with hard connection if the similarity is higher than the threshold;
+- Clusters are obtained based on the graph and small clusters are discarded.
 
 ![Clustering algorithm for multi-faces videos](images/clustering_deepfake_global.gif)
 

@@ -76,6 +76,10 @@ if __name__ == "__main__":
     with open(opt.config, 'r') as ymlfile:
         config = yaml.safe_load(ymlfile)
 
+    # Check for integrity
+    if config['model']['num-frames'] != 8 and config['model']['num-frames'] != 16:
+        raise Exception("Invalid number of frames.")
+
     # Setup CUDA settings
     torch.cuda.set_device(opt.gpu_id) 
     torch.backends.cudnn.deterministic = True
@@ -254,20 +258,16 @@ if __name__ == "__main__":
             identities_masks = identities_masks.to(opt.gpu_id)
             masks = masks.to(opt.gpu_id)
             positions = positions.to(opt.gpu_id)
-
-            if opt.model == 0: # Baseline
-                videos = rearrange(videos, "b f h w c -> (b f) c h w")
+            videos = rearrange(videos, "b f h w c -> (b f) c h w")
+            if opt.freeze_backbone:
+                with torch.no_grad():
+                    features = features_extractor.extract_features(videos)  
+            else:
                 features = features_extractor.extract_features(videos)  
+            if opt.model == 0: # Baseline
                 y_pred = model(features)
-                y_pred = torch.mean(y_pred.reshape(-1, self.num_frames), axis=1)
+                y_pred = torch.mean(y_pred.reshape(-1, config["model"]["num-frames"]), axis=1).unsqueeze(1)
             elif opt.model == 1: # Size-Invariant TimeSformer
-                videos = rearrange(videos, 'b f h w c -> (b f) c h w')                                               # B*8 x 3 x 224 x 224
-                if opt.freeze_backbone:
-                    with torch.no_grad():
-                        features = features_extractor.extract_features(videos)                                               # B*8 x 1280 x 7 x 7
-                else:
-                    features = features_extractor.extract_features(videos)                                               # B*8 x 1280 x 7 x 7
-    
                 features = rearrange(features, '(b f) c h w -> b f c h w', b = b, f = f)
                 y_pred = model(features, mask=masks, size_embedding=size_embeddings, identities_mask=identities_masks, positions=positions)
         
@@ -299,7 +299,6 @@ if __name__ == "__main__":
                 expected_time = str(timedelta(seconds=(times_per_batch / (index+1))*total_batches-index))
                 print("\nLoss: ", total_loss/counter, "Accuracy: ", train_correct/(counter*config['training']['bs']) ,"Train 0s: ", negative, "Train 1s:", positive, "Expected Time:", expected_time)
 
-
             bar.next()
         
         # Clean variables before moving into validation
@@ -324,15 +323,15 @@ if __name__ == "__main__":
             # Do not update the gradient during validation
             with torch.no_grad():
                 if opt.model == 0: 
-                    videos = reduce(videos, "b f h w c -> b h w c", 'mean')
-                    videos = rearrange(videos, "b h w c -> b c h w")
+                    videos = rearrange(videos, 'b f h w c -> (b f) c h w')  
                     features = features_extractor.extract_features(videos)  
                     val_pred = model(features)
+                    val_pred = torch.mean(val_pred.reshape(-1, config["model"]["num-frames"]), axis=1).unsqueeze(1)
                 elif opt.model == 1:
                     videos = rearrange(videos, 'b f h w c -> (b f) c h w')                                       # B*8 x 3 x 224 x 224
                     features = features_extractor.extract_features(videos)                                           # B*8 x 1280 x 7 x 7
                     features = rearrange(features, '(b f) c h w -> b f c h w', b = b, f = f)   
-                    val_pred = model(features, mask=masks, size_embedding=size_embeddings, identities_masks=identities_masks, positions=positions)
+                    val_pred = model(features, mask=masks, size_embedding=size_embeddings, identities_mask=identities_masks, positions=positions)
 
                 videos = videos.cpu()
                 val_pred = val_pred.cpu()
@@ -361,13 +360,13 @@ if __name__ == "__main__":
         else:
             not_improved_loss = 0
 
-        previous_loss = total_val_loss
 
         # Save checkpoint if the model's validation loss is improving
         if previous_loss > total_val_loss:
             torch.save(features_extractor.state_dict(), os.path.join(opt.models_output_path,  "EfficientNetExtractor_checkpoint" + str(t)))
             torch.save(model.state_dict(), os.path.join(opt.models_output_path,  "SizeInvariantTimeSformer_checkpoint" + str(t)))
 
+        previous_loss = total_val_loss
         # Log some metrics into Tensorboard
         tb_logger.add_scalar("Training/Accuracy", train_correct, t)
         tb_logger.add_scalar("Training/Loss", total_loss, t)

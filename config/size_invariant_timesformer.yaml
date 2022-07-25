@@ -1,12 +1,12 @@
 training:
-  lr: 1.0e-5
+  lr: 0.01
   weight-decay: 0.0001
   bs: 8
   val_bs: 8
-  optimizer: 'AdamW'
+  optimizer: 'SGD'
   scheduler: 'cosinelr' 
   gamma: 0.1
-  step-size: 15
+  step-size: 5
 
 
 model:
@@ -17,11 +17,10 @@ model:
   num-frames: 16
   max-identities: 2
   dim: 512
-  depth: 6
+  depth: 9
   dim-head: 64
   channels: 1280
   heads: 8
-  emb-dim: 32
   attn-dropout: 0.
   ff-dropout: 0.
   shift-tokens: False

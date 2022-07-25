@@ -207,7 +207,9 @@ The algorithm is structured as follows:
 - The features of each face are extracted via an InceptionResnetV1 pretrained on FaceNet;
 - The distance between each face and all faces identified in the video is calculated;
 - A graph is constructed with hard connection if the similarity is higher than the threshold;
-- Clusters are obtained based on the graph and small clusters are discarded.
+- Clusters are obtained based on the graph and small clusters are discarded;
+- The faces inside the clusters are temporally reordered;
+- The clusters are enumerated based on mean cluster size during data loading. 
 
 ![Clustering algorithm for multi-faces videos](images/clustering_deepfake_global.gif)
 

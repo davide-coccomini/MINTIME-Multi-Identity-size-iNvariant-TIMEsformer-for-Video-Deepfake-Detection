@@ -327,7 +327,11 @@ For our TimeSformer we apply the version of attention that was most effective in
 ![Divided Space-Time Attention](images/divided_space_time_attention.gif)
 
 As far as spatial attention is concerned, no further effort is required for this to be applied to our case.  
-Not being interested in capturing the relationships between faces of different identities, the calculation of temporal attention in our case is carried out exclusively between faces belonging to the same identity. All faces, however, influence the CLS that is global and unique for all identities. 
+Not being interested in capturing the relationships between faces of different identities, the calculation of temporal attention in our case is carried out exclusively between faces belonging to the same identity. 
+
+![Multi-Face Identity-based Attention Calculation](images/identity_attention.gif)
+
+All faces, however, influence the CLS that is global and unique for all identities. 
 In the animation below, it is shown how attention is calculated exclusively by tokens referring to identity 0 faces (green), ignoring those referring to identity 1 faces (red) and vice versa. While all refer to the global CLS.
 
 ![Multi-Face Identity-based Attention Calculation](images/attention_calculations_multi_face.gif)

@@ -23,10 +23,9 @@ from tqdm import tqdm
 
 def extract_video(video, data_path):
     # Composes the path where the coordinates of the detected faces were saved
-    
-    bboxes_path = data_path +  "/boxes/" + video.split("video/")[-1].split(".")[0] + ".json"
+    bboxes_path = data_path +  "/boxes_better/" + video.split("video/")[-1].split(".")[0] + ".json"
     if not os.path.exists(bboxes_path) or not os.path.exists(video):
-        print(bboxes_path, "not found")
+        print(bboxes_path, "not found\n")
         return
 
     # Load the json dictionary and the corresponding video
@@ -38,7 +37,6 @@ def extract_video(video, data_path):
    
 
     # For each frame, save the detected faces into files
-    counter = 0
     frames = []
     for i in range(frames_num):
         capture.grab()
@@ -48,8 +46,8 @@ def extract_video(video, data_path):
         frames.append(frame)
 
     explored_indexes = []
-    for i in range(0, len(frames), fps):
 
+    for i in range(0, len(frames), fps):
         while str(i) not in bboxes_dict:
             if i == frames_num - 1:
                 i -= 1
@@ -57,15 +55,23 @@ def extract_video(video, data_path):
                 break
             else:
                 explored_indexes.append(i)
+
         frame = frames[i]
         id = os.path.splitext(os.path.basename(video))[0]
         crops = []
-        bboxes = bboxes_dict[str(i)]
-        if bboxes is None:
+        index = i
+        limit = i + fps - 1
+        keys = [int(x) for x in list(bboxes_dict.keys())]
+
+        while index < limit:
+            index += 1
+            if index in keys and bboxes_dict[str(index)] is not None:
+                break
+        if index == limit:
             continue
-        else:
-            counter += 1
-        
+
+        bboxes = bboxes_dict[str(index)]
+
         for bbox in bboxes:
             xmin, ymin, xmax, ymax = [int(b * 2) for b in bbox]
             w = xmax - xmin
@@ -121,11 +127,11 @@ def extract_video(video, data_path):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--list_file', default="../../datasets/ForgeryNet/Validation/video_list.txt", type=str,
+    parser.add_argument('--list_file', default="../../datasets/ForgeryNet/Training/video_list.txt", type=str,
                         help='Images List txt file path)')
-    parser.add_argument('--data_path', default='../../datasets/ForgeryNet/Validation', type=str,
+    parser.add_argument('--data_path', default='../../datasets/ForgeryNet/Training', type=str,
                         help='Videos directory')
-    parser.add_argument('--output_path', default='../../datasets/ForgeryNet/Validation/crops', type=str,
+    parser.add_argument('--output_path', default='../../datasets/ForgeryNet/Training/faces_fix/crops_fix', type=str,
                         help='Output directory')
     parser.add_argument('--gpu_id', default=0, type=int,
                         help='ID of GPU to be used')
@@ -143,10 +149,11 @@ if __name__ == '__main__':
     df = pd.read_csv(opt.list_file, sep=' ', names=column_names)
     videos_paths = df.values.tolist()
     videos_paths = list(dict.fromkeys([os.path.join(opt.data_path, "video", os.path.dirname(row[1].split(" ")[0]), "video.mp4") for row in videos_paths]))
-
+  
     # Start face extraction
     with Pool(processes=opt.workers) as p:
         with tqdm(total=len(videos_paths)) as pbar:
             for v in p.imap_unordered(partial(extract_video, data_path=opt.data_path), videos_paths):
                 pbar.update()
 
+    

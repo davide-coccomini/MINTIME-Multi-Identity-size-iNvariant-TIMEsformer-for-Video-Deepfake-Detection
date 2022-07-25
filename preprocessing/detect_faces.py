@@ -109,7 +109,7 @@ def main():
     
     videos_paths = [video_path for video_path in videos_paths if video_path not in excluded_videos]
     print("Excluded videos:", len(excluded_videos))
-    videos_paths = videos_paths[14:]
+
     # Start face detection
     process_videos(videos_paths, opt.detector_type, opt)
     

@@ -143,27 +143,6 @@ if __name__ == "__main__":
         print("Error: Invalid optimizer specified in the config file.")
         exit()
 
-    # Init LR schedulers
-    if config['training']['scheduler'].lower() == 'steplr':   
-        scheduler = lr_scheduler.StepLR(optimizer, step_size=config['training']['step-size'], gamma=config['training']['gamma'])
-    elif config['training']['scheduler'].lower() == 'cosinelr':
-        lr_scheduler = CosineLRScheduler(
-                optimizer,
-                t_initial=opt.num_epochs,
-                lr_min=config['training']['lr'] * 1e-2,
-                cycle_limit=1,
-                t_in_epochs=False,
-        )
-    else:
-        print("Warning: Invalid scheduler specified in the config file.")
-
-
-    starting_epoch = 0
-    if os.path.exists(opt.resume):
-        model.load_state_dict(torch.load(opt.resume))
-        starting_epoch = int(opt.resume.split("checkpoint")[1].split("_")[0]) + 1 # The checkpoint's file name format should be "checkpoint_EPOCH"
-    else:
-        print("No checkpoint loaded for TimeSformer.")
 
     
     # Read all the paths and initialize data loaders for train and validation
@@ -225,7 +204,30 @@ if __name__ == "__main__":
                                     pin_memory=False, drop_last=False, timeout=0,
                                     worker_init_fn=None, prefetch_factor=2,
                                     persistent_workers=False)
-   
+
+    # Init LR schedulers
+    if config['training']['scheduler'].lower() == 'steplr':   
+        scheduler = lr_scheduler.StepLR(optimizer, step_size=config['training']['step-size'], gamma=config['training']['gamma'])
+    elif config['training']['scheduler'].lower() == 'cosinelr':
+        num_steps = int(opt.num_epochs * len(train_dl))
+        lr_scheduler = CosineLRScheduler(
+                optimizer,
+                t_initial=num_steps,
+                lr_min=config['training']['lr'] * 1e-2,
+                cycle_limit=1,
+                t_in_epochs=False,
+        )
+    else:
+        print("Warning: Invalid scheduler specified in the config file.")
+
+
+    starting_epoch = 0
+    if os.path.exists(opt.resume):
+        model.load_state_dict(torch.load(opt.resume))
+        starting_epoch = int(opt.resume.split("checkpoint")[1].split("_")[0]) + 1 # The checkpoint's file name format should be "checkpoint_EPOCH"
+    else:
+        print("No checkpoint loaded for TimeSformer.")
+
     # Init variables for training
     not_improved_loss = 0
     previous_loss = math.inf

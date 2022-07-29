@@ -78,8 +78,6 @@ class DeepFakesDataset(Dataset):
         try:
             mean_side = mean([int(re.search('(\d+) x (\d+)', magic.from_file(face)).groups()[0]) for face in faces])
         except:
-            print(faces)
-            print(identity)
             mean_side = 0
 
         number_of_faces = len(faces)

@@ -8,6 +8,8 @@ training:
   gamma: 0.1
   step-size: 5
 
+test:
+  bs: 1
 
 model:
   image-size: 224

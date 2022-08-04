@@ -228,7 +228,7 @@ if __name__ == "__main__":
         model.load_state_dict(torch.load(opt.resume))
         starting_epoch = int(opt.resume.split("checkpoint")[1].split("_")[0]) + 1 # The checkpoint's file name format should be "checkpoint_EPOCH"
     else:
-        print("No checkpoint loaded for TimeSformer.")
+        print("No checkpoint loaded for the model.")
 
     # Init variables for training
     not_improved_loss = 0

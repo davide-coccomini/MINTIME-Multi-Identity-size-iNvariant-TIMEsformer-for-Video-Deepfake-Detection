@@ -41,7 +41,9 @@ if __name__ == "__main__":
     parser.add_argument('--validation_list_file', default="../datasets/ForgeryNet/faces/val.csv", type=str,
                         help='Validation List txt file path)')  
     parser.add_argument('--data_path', default="../datasets/ForgeryNet/faces", type=str,
-                        help='Path to the dataset converted into identities')
+                        help='Path to the dataset converted into identities.')
+    parser.add_argument('--video_path', default="../datasets/ForgeryNet/videos", type=str,
+                        help='Path to the dataset original videos (.mp4 files).')
     parser.add_argument('--num_epochs', default=30, type=int,
                         help='Number of training epochs.')
     parser.add_argument('--workers', default=8, type=int,
@@ -79,7 +81,7 @@ if __name__ == "__main__":
     # Check for integrity
     if config['model']['num-frames'] != 8 and config['model']['num-frames'] != 16:
         raise Exception("Invalid number of frames.")
-
+        
     # Setup CUDA settings
     torch.cuda.set_device(opt.gpu_id) 
     torch.backends.cudnn.deterministic = True
@@ -148,15 +150,15 @@ if __name__ == "__main__":
     # Read all the paths and initialize data loaders for train and validation
     paths = []
     col_names = ["video", "label", "8_cls"]
-    
     df_train = pd.read_csv(opt.train_list_file, sep=' ', names=col_names)
     df_validation = pd.read_csv(opt.validation_list_file, sep=' ', names=col_names)
-    
+
     df_train = df_train.sample(frac=1, random_state=opt.random_state).reset_index(drop=True)
     df_validation = df_validation.sample(frac=1, random_state=opt.random_state).reset_index(drop=True)
 
     train_videos = df_train['video'].tolist()
     train_labels = df_train['label'].tolist()
+    
     validation_videos = df_validation['video'].tolist()
     validation_labels = df_validation['label'].tolist()
 
@@ -191,14 +193,14 @@ if __name__ == "__main__":
     loss_fn = torch.nn.BCEWithLogitsLoss(pos_weight=torch.tensor([class_weights]))
 
     # Create the data loaders 
-    train_dataset = DeepFakesDataset(train_videos, train_labels, image_size=config['model']['image-size'], data_path=opt.data_path, num_frames=config['model']['num-frames'], num_patches=num_patches, max_identities=config['model']['max-identities'])
+    train_dataset = DeepFakesDataset(train_videos, train_labels, image_size=config['model']['image-size'], data_path=opt.data_path, video_path=opt.video_path, num_frames=config['model']['num-frames'], num_patches=num_patches, max_identities=config['model']['max-identities'])
     train_dl = torch.utils.data.DataLoader(train_dataset, batch_size=config['training']['bs'], shuffle=True, sampler=None,
                                  batch_sampler=None, num_workers=opt.workers, collate_fn=None,
                                  pin_memory=False, drop_last=False, timeout=0,
                                  worker_init_fn=None, prefetch_factor=2,
                                  persistent_workers=False)
 
-    validation_dataset = DeepFakesDataset(validation_videos, validation_labels, image_size=config['model']['image-size'], data_path=opt.data_path, num_frames=config['model']['num-frames'], num_patches=num_patches, max_identities=config['model']['max-identities'], mode='val')
+    validation_dataset = DeepFakesDataset(validation_videos, validation_labels, image_size=config['model']['image-size'], data_path=opt.data_path, video_path=opt.video_path, num_frames=config['model']['num-frames'], num_patches=num_patches, max_identities=config['model']['max-identities'], mode='val')
     val_dl = torch.utils.data.DataLoader(validation_dataset, batch_size=config['training']['val_bs'], shuffle=True, sampler=None,
                                     batch_sampler=None, num_workers=opt.workers, collate_fn=None,
                                     pin_memory=False, drop_last=False, timeout=0,

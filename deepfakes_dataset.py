@@ -25,14 +25,16 @@ from statistics import mean
 
 
 ORIGINAL_VIDEOS_PATH = {"train": "../datasets/ForgeryNet/Training/video/train_video_release", "val": "../datasets/ForgeryNet/Training/video/train_video_release", "test": "../datasets/ForgeryNet/Validation/video/val_video_release"}
+
 RANGE_SIZE = 5
 SIZE_EMB_DICT = [(1+i*RANGE_SIZE, (i+1)*RANGE_SIZE) if i != 0 else (0, RANGE_SIZE) for i in range(20)]
 
 class DeepFakesDataset(Dataset):
-    def __init__(self, videos_paths, labels, data_path, image_size, mode = 'train', model = 0, num_frames = 8, max_identities = 3, num_patches=49):
+    def __init__(self, videos_paths, labels, data_path, video_path, image_size, mode = 'train', model = 0, num_frames = 8, max_identities = 3, num_patches=49):
         self.x = videos_paths
         self.y = labels
         self.data_path = data_path
+        self.video_path = video_path
         self.image_size = image_size
         self.mode = mode
         self.n_samples = len(videos_paths)
@@ -148,7 +150,16 @@ class DeepFakesDataset(Dataset):
     def __getitem__(self, index):
         video_path = self.x[index]
         video_path = os.path.join(self.data_path, video_path) 
-        original_video_path = os.path.join(ORIGINAL_VIDEOS_PATH[self.mode], video_path.split(self.mode + os.path.sep)[1])
+        video_id =  video_path.split(self.mode + os.path.sep)[1]
+
+        original_video_path = os.path.join(self.video_path, self.mode, video_id)
+        if not os.path.exists(original_video_path) and self.mode == "val":
+            original_video_path = os.path.join(self.video_path, "train", video_id)
+        
+        if not os.path.exists(original_video_path):
+            raise Exception("Invalid video path for video.", original_video_path)
+
+
         identities, discarded_faces = self.get_sorted_identities(video_path)
         mask = []
         last_range_end = 0

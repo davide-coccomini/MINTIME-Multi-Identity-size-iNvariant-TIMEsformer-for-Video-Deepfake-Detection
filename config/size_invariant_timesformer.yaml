@@ -9,7 +9,7 @@ training:
   step-size: 5
 
 test:
-  bs: 1
+  bs: 16
 
 model:
   image-size: 224

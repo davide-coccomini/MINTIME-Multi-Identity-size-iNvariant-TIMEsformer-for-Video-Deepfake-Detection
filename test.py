@@ -84,7 +84,7 @@ if __name__ == "__main__":
         features_extractor.load_matching_state_dict(torch.load(opt.extractor_weights, map_location=torch.device('cpu')))
         print("Custom features extractor weights loaded.")
     
-      # Init the required model
+    # Init the required model
     if opt.model == 0:
         model = Baseline(config=config)
         num_patches = None
@@ -93,11 +93,16 @@ if __name__ == "__main__":
         num_patches = config['model']['num-patches']
 
     
-    if os.path.exists(opt.resume):
-        model.load_state_dict(torch.load(opt.resume))
+    if os.path.exists(opt.model_weights):
+        model.load_state_dict(torch.load(opt.model_weights))
     else:
         raise Exception("No checkpoint loaded for the model.")    
 
+    loss_fn = torch.nn.BCEWithLogitsLoss()
+
+    # Move into GPU
+    features_extractor = features_extractor.to(opt.gpu_id)    
+    model = model.to(opt.gpu_id)
     features_extractor.eval()
     model.eval()
        
@@ -107,6 +112,7 @@ if __name__ == "__main__":
     df_test = pd.read_csv(opt.test_list_file, sep=' ', names=col_names)
     test_videos = df_test['video'].tolist()
     test_labels = df_test['label'].tolist()
+
 
     if opt.max_videos > -1:
         test_videos = test_videos[:opt.max_videos]
@@ -128,8 +134,15 @@ if __name__ == "__main__":
     test_counters = collections.Counter(test_labels)
     print(test_counters)
 
+    # Init variables
+    total_test_loss = 0
+    test_correct = 0
+    test_positive = 0
+    test_negative = 0
+    test_counter = 0
+    bar = ChargingBar('PREDICT', max=(len(test_dl)))
 
-    
+    # Test loop
     for index, (videos, size_embeddings, masks, identities_masks, positions, labels) in enumerate(test_dl):
         b, f, h, w, c = videos.shape
         labels = labels.unsqueeze(1).float()
@@ -137,18 +150,18 @@ if __name__ == "__main__":
         identities_masks = identities_masks.to(opt.gpu_id)
         masks = masks.to(opt.gpu_id)
         positions = positions.to(opt.gpu_id)
-        videos = rearrange(videos, "b f h w c -> (b f) c h w")
+
         
-        if opt.model == 0: 
-            videos = rearrange(videos, 'b f h w c -> (b f) c h w')  
+        with torch.no_grad():
+            videos = rearrange(videos, "b f h w c -> (b f) c h w")
             features = features_extractor.extract_features(videos)  
-            test_pred = model(features)
-            test_pred = torch.mean(test_pred.reshape(-1, config["model"]["num-frames"]), axis=1).unsqueeze(1)
-        elif opt.model == 1:
-            videos = rearrange(videos, 'b f h w c -> (b f) c h w')                                       # B*8 x 3 x 224 x 224
-            features = features_extractor.extract_features(videos)                                           # B*8 x 1280 x 7 x 7
-            features = rearrange(features, '(b f) c h w -> b f c h w', b = b, f = f)   
-            test_pred = model(features, mask=masks, size_embedding=size_embeddings, identities_mask=identities_masks, positions=positions)
+
+            if opt.model == 0: 
+                test_pred = model(features)
+                test_pred = torch.mean(test_pred.reshape(-1, config["model"]["num-frames"]), axis=1).unsqueeze(1)
+            elif opt.model == 1:
+                features = rearrange(features, '(b f) c h w -> b f c h w', b = b, f = f)   
+                test_pred = model(features, mask=masks, size_embedding=size_embeddings, identities_mask=identities_masks, positions=positions)
 
         videos = videos.cpu()
         test_pred = test_pred.cpu()
@@ -167,6 +180,6 @@ if __name__ == "__main__":
     total_test_loss /= test_counter
     test_correct /= test_samples
 
-    print(str(opt.model_weights) + ": " + str(opt.num_epochs) + " test loss:" +
-            str(test_loss) + " test accuracy:" + str(test_correct) + " test_0s:" + str(test_negative) + "/" + str(test_counters[0]) + " test_1s:" + str(test_negative) + "/" + str(test_counters[1]))
+    print(str(opt.model_weights) + " test loss:" +
+            str(total_test_loss) + " test accuracy:" + str(test_correct) + " test_0s:" + str(test_negative) + "/" + str(test_counters[0]) + " test_1s:" + str(test_positive) + "/" + str(test_counters[1]))
     

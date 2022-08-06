@@ -52,6 +52,8 @@ if __name__ == "__main__":
                         help='Random state value')
     parser.add_argument('--freeze_backbone', default=False, action="store_true",
                         help='Maintain the backbone freezed or train it.')
+    parser.add_argument('--restore_epoch', default=False, action="store_true",
+                        help='When resume checkpoint specified, resume from the exact epoch.')
     parser.add_argument('--extractor_unfreeze_blocks', type=int, default=-1, 
                         help="How many layers unfreeze in the extractor.")
     parser.add_argument('--extractor_weights', default='ImageNet', type=str,
@@ -226,7 +228,8 @@ if __name__ == "__main__":
     starting_epoch = 0
     if os.path.exists(opt.resume):
         model.load_state_dict(torch.load(opt.resume))
-        starting_epoch = int(opt.resume.split("checkpoint")[1].split("_")[0]) + 1 # The checkpoint's file name format should be "checkpoint_EPOCH"
+        if opt.restore_epoch:
+            starting_epoch = int(opt.resume.split("checkpoint")[1].split("_")[0]) + 1 # The checkpoint's file name format should be "checkpoint_EPOCH"
     else:
         print("No checkpoint loaded for the model.")
 

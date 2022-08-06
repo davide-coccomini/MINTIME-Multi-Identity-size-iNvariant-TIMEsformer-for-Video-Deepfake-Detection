@@ -13,6 +13,7 @@ import tensorflow as tf
 import collections
 import os
 import json
+from sklearn import metrics
 from itertools import chain
 import random
 from einops import rearrange, reduce
@@ -110,9 +111,12 @@ if __name__ == "__main__":
     paths = []
     col_names = ["video", "label", "8_cls"]
     df_test = pd.read_csv(opt.test_list_file, sep=' ', names=col_names)
+    df_test = df_test.sample(frac=1, random_state=opt.random_state).reset_index(drop=True)
+
     test_videos = df_test['video'].tolist()
     test_labels = df_test['label'].tolist()
-
+    multiclass_labels = df_test['8_cls'].tolist()
+    class_counter = collections.Counter(multiclass_labels)
 
     if opt.max_videos > -1:
         test_videos = test_videos[:opt.max_videos]
@@ -121,8 +125,8 @@ if __name__ == "__main__":
     test_samples = len(test_videos)
 
     # Create the data loaders 
-    test_dataset = DeepFakesDataset(test_videos, test_labels, image_size=config['model']['image-size'], data_path=opt.data_path, video_path=opt.video_path, num_frames=config['model']['num-frames'], num_patches=num_patches, max_identities=config['model']['max-identities'], mode='test')
-    test_dl = torch.utils.data.DataLoader(test_dataset, batch_size=config['test']['bs'], shuffle=True, sampler=None,
+    test_dataset = DeepFakesDataset(test_videos, test_labels, multiclass_labels = multiclass_labels, image_size=config['model']['image-size'], data_path=opt.data_path, video_path=opt.video_path, num_frames=config['model']['num-frames'], num_patches=num_patches, max_identities=config['model']['max-identities'], mode='test')
+    test_dl = torch.utils.data.DataLoader(test_dataset, batch_size=config['test']['bs'], shuffle=False, sampler=None,
                                     batch_sampler=None, num_workers=opt.workers, collate_fn=None,
                                     pin_memory=False, drop_last=False, timeout=0,
                                     worker_init_fn=None, prefetch_factor=2,
@@ -130,7 +134,7 @@ if __name__ == "__main__":
 
     # Print some useful statistics
     print("Test videos:", test_samples)
-    print("_TEST STATS__")
+    print("__TEST STATS__")
     test_counters = collections.Counter(test_labels)
     print(test_counters)
 
@@ -140,10 +144,16 @@ if __name__ == "__main__":
     test_positive = 0
     test_negative = 0
     test_counter = 0
+
+    multiclass_errors = dict.fromkeys([i for i in range(9)])
+    for key in multiclass_errors:
+        multiclass_errors[key] = [0, class_counter[key]]
+    
     bar = ChargingBar('PREDICT', max=(len(test_dl)))
+    preds = []
 
     # Test loop
-    for index, (videos, size_embeddings, masks, identities_masks, positions, labels) in enumerate(test_dl):
+    for index, (videos, size_embeddings, masks, identities_masks, positions, labels, multiclass_labels) in enumerate(test_dl):
         b, f, h, w, c = videos.shape
         labels = labels.unsqueeze(1).float()
         videos = videos.to(opt.gpu_id)
@@ -167,19 +177,22 @@ if __name__ == "__main__":
         test_pred = test_pred.cpu()
         test_loss = loss_fn(test_pred, labels)
         total_test_loss += round(test_loss.item(), 2)
-        corrects, positive_class, negative_class = check_correct(test_pred, labels)
+        corrects, positive_class, negative_class, multiclass_errors = check_correct(test_pred, labels, multiclass_labels, multiclass_errors)
         test_correct += corrects
         test_positive += positive_class
         test_counter += 1
         test_negative += negative_class
+        preds.extend(test_pred)
         bar.next()
-
     
+    preds = [torch.sigmoid(torch.tensor(pred)) for pred in preds]
+    fpr, tpr, th = metrics.roc_curve(test_labels, preds)
+    auc = metrics.auc(fpr, tpr)
     bar.finish()
-        
     total_test_loss /= test_counter
     test_correct /= test_samples
 
+    print("Class errors", multiclass_errors)
     print(str(opt.model_weights) + " test loss:" +
-            str(total_test_loss) + " test accuracy:" + str(test_correct) + " test_0s:" + str(test_negative) + "/" + str(test_counters[0]) + " test_1s:" + str(test_positive) + "/" + str(test_counters[1]))
+            str(total_test_loss) + " test accuracy:" + str(test_correct) + " test_0s:" + str(test_negative) + "/" + str(test_counters[0]) + " test_1s:" + str(test_positive) + "/" + str(test_counters[1]) + " AUC " + str(auc))
     

@@ -5,7 +5,7 @@ import argparse
 from tqdm import tqdm
 import math
 import yaml
-from utils import check_correct
+from utils import check_correct, aggregate_attentions, save_attention_plots
 from torch.optim.lr_scheduler import LambdaLR
 from datetime import datetime, timedelta
 from statistics import mean
@@ -33,6 +33,8 @@ from timm.scheduler.cosine_lr import CosineLRScheduler
 from models.baseline import Baseline
 
 
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     
@@ -58,6 +60,8 @@ if __name__ == "__main__":
                         help="Which configuration to use. See into 'config' folder.")
     parser.add_argument('--model', type=int, 
                         help="Which model to use. (0: Baseline | 1: Size Invariant TimeSformer).")
+    parser.add_argument('--save_attentions', default=False, action="store_true",
+                        help='Save attentions plots.')
     opt = parser.parse_args()
     
     print(opt)
@@ -90,7 +94,7 @@ if __name__ == "__main__":
         model = Baseline(config=config)
         num_patches = None
     else:
-        model = SizeInvariantTimeSformer(config=config)
+        model = SizeInvariantTimeSformer(config=config, require_attention=True)
         num_patches = config['model']['num-patches']
 
     
@@ -153,7 +157,7 @@ if __name__ == "__main__":
     preds = []
 
     # Test loop
-    for index, (videos, size_embeddings, masks, identities_masks, positions, labels, multiclass_labels) in enumerate(test_dl):
+    for index, (videos, size_embeddings, masks, identities_masks, positions, tokens_per_identity, labels, multiclass_labels, video_ids) in enumerate(test_dl):
         b, f, h, w, c = videos.shape
         labels = labels.unsqueeze(1).float()
         videos = videos.to(opt.gpu_id)
@@ -171,7 +175,16 @@ if __name__ == "__main__":
                 test_pred = torch.mean(test_pred.reshape(-1, config["model"]["num-frames"]), axis=1).unsqueeze(1)
             elif opt.model == 1:
                 features = rearrange(features, '(b f) c h w -> b f c h w', b = b, f = f)   
-                test_pred = model(features, mask=masks, size_embedding=size_embeddings, identities_mask=identities_masks, positions=positions)
+                test_pred, attentions = model(features, mask=masks, size_embedding=size_embeddings, identities_mask=identities_masks, positions=positions)
+                
+                identity_names = [row[0] for row in tokens_per_identity]
+                frames_per_identity = [int(row[1] / config["model"]["num-patches"]) for row in tokens_per_identity]
+                
+                aggregated_attentions, identity_attentions = aggregate_attentions(attentions, config['model']['heads'], config['model']['num-frames'], frames_per_identity)
+                if len(identity_attentions) > 1:
+                    print(torch.sigmoid(test_pred[0]), labels[0], identity_attentions, identity_names)
+                if opt.save_attentions:
+                    save_attention_plots(aggregated_attentions, identity_names, frames_per_identity, config['model']['num-frames'], video_ids[0])
 
         videos = videos.cpu()
         test_pred = test_pred.cpu()

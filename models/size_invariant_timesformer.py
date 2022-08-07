@@ -2,11 +2,13 @@ import torch
 from torch import nn, einsum
 import torch.nn.functional as F
 from einops import rearrange, repeat
-
+from statistics import mean
 from models.efficientnet.efficientnet_pytorch import EfficientNet
 from torch.nn.init import trunc_normal_
 import cv2
 import numpy as np
+from random import random
+
 
 # helpers
 def exists(val):
@@ -82,7 +84,7 @@ def attn(q, k, v, mask = None):
         sim.masked_fill_(~mask, max_neg_value)
     attn = sim.softmax(dim = -1)
     out = einsum('b i j, b j d -> b i d', attn, v)
-    return out
+    return out, attn
 
 class Attention(nn.Module):
     def __init__(
@@ -114,7 +116,7 @@ class Attention(nn.Module):
         (cls_q, q_), (cls_k, k_), (cls_v, v_) = map(lambda t: (t[:, :1], t[:, 1:]), (q, k, v))
 
         # let classification token attend to key / values of all patches across time and space
-        cls_out = attn(cls_q, k, v, mask = cls_mask)
+        cls_out, cls_attentions = attn(cls_q, k, v, mask = cls_mask)
         # rearrange across time or space
         q_, k_, v_ = map(lambda t: rearrange(t, f'{einops_from} -> {einops_to}', **einops_dims), (q_, k_, v_))
        
@@ -126,26 +128,26 @@ class Attention(nn.Module):
         v_ = torch.cat((cls_v, v_), dim = 1)
 
         # attention
-        out = attn(q_, k_, v_, mask = mask)
-
+        out, attentions = attn(q_, k_, v_, mask = mask)
         # merge back time or space
         out = rearrange(out, f'{einops_to} -> {einops_from}', **einops_dims)
 
         # concat back the cls token
         out = torch.cat((cls_out, out), dim = 1)
-
+      
         # merge back the heads
         out = rearrange(out, '(b h) n d -> b n (h d)', h = h)
-
+        
         # combine heads out
-        return self.to_out(out)
+        return self.to_out(out), cls_attentions
 
 
 class SizeInvariantTimeSformer(nn.Module):
     def __init__(
         self,
         *,
-        config
+        config,
+        require_attention = False
     ):
         
         super().__init__()
@@ -164,7 +166,7 @@ class SizeInvariantTimeSformer(nn.Module):
         self.ff_dropout = config['model']['ff-dropout']
         self.shift_tokens = config['model']['shift-tokens']
         self.enable_size_emb = config['model']['enable-size-emb']
-
+        self.require_attention = require_attention
 
         num_positions = self.num_frames * self.channels
         self.to_patch_embedding = nn.Linear(self.channels , self.dim)
@@ -183,8 +185,8 @@ class SizeInvariantTimeSformer(nn.Module):
             if self.shift_tokens:
                 time_attn, spatial_attn, ff = map(lambda t: PreTokenShift(num_frames, t), (time_attn, spatial_attn, ff))
 
+           
             time_attn, spatial_attn, ff = map(lambda t: PreNorm(self.dim, t), (time_attn, spatial_attn, ff))
-
             self.layers.append(nn.ModuleList([time_attn, spatial_attn, ff]))
 
         self.to_out = nn.Sequential(
@@ -216,12 +218,12 @@ class SizeInvariantTimeSformer(nn.Module):
             return {'pos_emb', 'cls_token'}
 
 
-    def forward(self, x, mask = None,  identities_mask = None, size_embedding = None, positions=None):
+    def forward(self, x, mask = None,  identities_mask = None, size_embedding = None, positions = None):
         b, f, c, h, w, *_, device = *x.shape, x.device
         n = h * w
         x = rearrange(x, 'b f c h w -> b (f h w) c')                                   # B x F*P*P x C
-        tokens = self.to_patch_embedding(x)                                            # B x 8*7*7 x 256
-				
+        tokens = self.to_patch_embedding(x)                                            # B x 8*7*7 x dim
+		
         # Add cls token
         cls_token = repeat(self.cls_token, 'n d -> b n d', b = b)
         x =  torch.cat((cls_token, tokens), dim = 1)
@@ -249,12 +251,19 @@ class SizeInvariantTimeSformer(nn.Module):
         # CLS mask
         cls_attn_mask = repeat(mask, 'b f -> (b h) () (f n)', n = n, h = self.heads)
         cls_attn_mask = F.pad(cls_attn_mask, (1, 0), value = True)
-  
+
         # Time and space attention
         for (time_attn, spatial_attn, ff) in self.layers:
-            x = time_attn(x, 'b (f n) d', '(b n) f d', n = n, mask = frame_mask, cls_mask = cls_attn_mask) + x
-            x = spatial_attn(x, 'b (f n) d', '(b f) n d', f = f, cls_mask = cls_attn_mask) + x
+            y, time_attention = time_attn(x, 'b (f n) d', '(b n) f d', n = n, mask = frame_mask, cls_mask = cls_attn_mask)
+            x = x + y
+            y, space_attention = spatial_attn(x, 'b (f n) d', '(b f) n d', f = f, cls_mask = cls_attn_mask)
+            x = x + y
             x = ff(x) + x
 
         cls_token = x[:, 0]
-        return self.to_out(cls_token)
+        attentions = [space_attention, time_attention]
+
+        if self.require_attention:
+            return self.to_out(cls_token), attentions
+        else:
+            return self.to_out(cls_token)

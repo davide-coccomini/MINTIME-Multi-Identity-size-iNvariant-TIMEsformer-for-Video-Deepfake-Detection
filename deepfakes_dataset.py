@@ -147,6 +147,7 @@ class DeepFakesDataset(Dataset):
                 needed_faces = self.num_frames - input_sequence_length
                 sorted_identities[-1][2] += needed_faces
                 input_sequence_length += needed_faces
+        
         return sorted_identities, discarded_faces
     
 
@@ -192,7 +193,7 @@ class DeepFakesDataset(Dataset):
                     identity_faces = identity_faces + missing_faces # Add the missing faces to the identity
 
             identity_faces = np.asarray(sorted(identity_faces, key=lambda x:int(os.path.basename(x).split("_")[0])))
-            
+
             # Select uniformly the frames in an alternate way
             if len(identity_faces) > max_faces:
                 if index % 2:
@@ -278,10 +279,12 @@ class DeepFakesDataset(Dataset):
             positions.insert(0,0) # Add CLS
         else:
             positions = []
+
+        tokens_per_identity = [(os.path.basename(identities[i][0]), identities[i][2]*self.num_patches + identities[i-1][2]*self.num_patches) if i > 0 else (os.path.basename(identities[i][0]), identities[i][2]*self.num_patches) for i in range(len(identities))]     
         if self.multiclass_labels == None:
             return torch.tensor(sequence).float(), torch.tensor(size_embeddings).int(), torch.tensor(mask).bool(), torch.tensor(identities_mask).bool(), torch.tensor(positions), self.y[index]
         else:       
-            return torch.tensor(sequence).float(), torch.tensor(size_embeddings).int(), torch.tensor(mask).bool(), torch.tensor(identities_mask).bool(), torch.tensor(positions), self.y[index], self.multiclass_labels[index]
+            return torch.tensor(sequence).float(), torch.tensor(size_embeddings).int(), torch.tensor(mask).bool(), torch.tensor(identities_mask).bool(), torch.tensor(positions), tokens_per_identity, self.y[index], self.multiclass_labels[index], video_id.replace("/", "_")
 
 
     def __len__(self):

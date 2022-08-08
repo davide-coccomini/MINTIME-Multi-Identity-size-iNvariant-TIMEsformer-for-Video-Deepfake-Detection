@@ -17,7 +17,47 @@ The special features of our proposal are as follows:
 - Introduction of a new embedding technique, namely size-embedding, to induce face-frame area ratio information to the TimeSformer;
 - Implementation of a final module for video-level classification in the presence of multiple faces to handle these particular cases as well.
 
+## Setup
+Clone the repository and move into it:
 
+```
+git clone https://github.com/davide-coccomini/MINTIME-Multi-Identity-size-iNvariant-TIMEsformer-for-Video-Deepfake-Detection.git
+
+cd MINTIME-Multi-Identity-size-iNvariant-TIMEsformer-for-Video-Deepfake-Detection
+```
+
+Setup Python environment using conda:
+
+```
+conda env create --file environment.yml
+conda activate deepfakes
+export PYTHONPATH=.
+```
+
+## Detect fakes in a video
+If you want to directly classify a video using pre-trained models, you can download the weights from the model zoo and use the following command:
+
+```
+python3 predict.py --video_path path/to/video.mp4 --model_weights path/to/model_weights --extractor_weights path/to/extractor_weights --config config/size_invariant_timesformer.yaml
+```
+
+The output video will be stored in the examples/preds folder:
+![Prediction Example](images/example_detection.gif)
+
+## Model ZOO
+
+
+| Model | Identities | Training Dataset | Test Dataset | Accuracy | AUC | Parameters |  Weights |
+| --------------- | --------------- | --------------- |  --------------- | --------------- | --------------- | --------------- | --------------- |
+| SlowFast R-50 | 1 | ForgeryNet | ForgeryNet | 88.78 | 93.88 | 33.6M | // |
+| TSM | 1 | ForgeryNet | ForgeryNet | 88.04 | 93.05 | 33.6M | // |
+| MINTIME | 1 | ForgeryNet | ForgeryNet | 78.10 | 85.95 | ??? | LINK |
+| MINTIME | 2 | ForgeryNet | ForgeryNet | 78.64 | 86.44 | ??? | LINK |
+| MINTIME | 3 | ForgeryNet | ForgeryNet | 78.46 | 86.30 | ??? | LINK |
+| EfficientNet-B0 + MLP | 2 | ForgeryNet | ForgeryNet | ??? | ??? | ??? | LINK |
+| MINTIME | 1 | DFDC | DFDC | ??? | ??? | ??? | LINK |
+| MINTIME | 2 | DFDC | DFDC | ??? | ??? | ??? | LINK |
+| EfficientNet-B0 + MLP | 2 | DFDC | DFDC | ??? | ??? | ??? | LINK |
 
 ## Dataset
 
@@ -39,22 +79,7 @@ The datasets can be downloaded at the following links:
 - DFDC: https://dfdc.ai/
 - FaceForensics++: https://github.com/ondyari/FaceForensics/blob/master/dataset/
 
-## Setup
-Clone the repository and move into it:
 
-```
-git clone https://github.com/davide-coccomini/Size-Invariant-Multi-Identity-TimeSformer-Based-Architecture-for-Video-Deepfake-Detection.git
-
-cd Size-Invariant-Multi-Identity-TimeSformer-Based-Architecture-for-Video-Deepfake-Detection
-```
-
-Setup Python environment using conda:
-
-```
-conda env create --file environment.yml
-conda activate deepfakes
-export PYTHONPATH=.
-```
 ## Preprocessing
 In order to use the proposed model, some preprocessing steps are required to convert the ForgeryNet into the desired format.
 
@@ -361,21 +386,6 @@ The following parameters can be changed as desired to perform different training
 | --------- |:---|:---------|:-----|
 | library(tidyverse) |import numpy as np|
 
-## Evaluation
-
-Table
-
-| Model | Identities | Training Dataset | Test Dataset | Accuracy | AUC | Parameters | 
-| --------------- | --------------- | --------------- |  --------------- | --------------- | --------------- | --------------- |
-| SlowFast R-50 | 1 | ForgeryNet | ForgeryNet | 88.78 | 93.88 | 33.6M |
-| TSM | 1 | ForgeryNet | ForgeryNet | 88.04 | 93.05 | 33.6M |
-| MINTIME | 1 | ForgeryNet | ForgeryNet | 78.10 | 85.95 | ??? |
-| MINTIME | 2 | ForgeryNet | ForgeryNet | 78.64 | 86.44 | ??? |
-| MINTIME | 3 | ForgeryNet | ForgeryNet | 78.46 | 86.30 | ??? |
-| EfficientNet-B0 + MLP | 2 | ForgeryNet | ForgeryNet | ??? | ??? | ??? |
-| MINTIME | 1 | DFDC | DFDC | ??? | ??? | ??? |
-| MINTIME | 2 | DFDC | DFDC | ??? | ??? | ??? |
-| EfficientNet-B0 + MLP | 2 | DFDC | DFDC | ??? | ??? | ??? |
 
 
 ### Baseline 

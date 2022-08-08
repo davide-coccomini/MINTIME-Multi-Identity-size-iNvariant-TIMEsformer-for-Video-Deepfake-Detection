@@ -355,9 +355,28 @@ The following parameters can be changed as desired to perform different training
 - --patience: How many epochs wait before stopping for validation loss not improving (default: 5);
 - --logger_name: Path to the folder for tensorboard logging (default: runs/train);
 
+## Amost always imports
+
+|  R |  Python |    Matlab |
+| --------- |:---|:---------|:-----|
+| library(tidyverse) |import numpy as np|
 
 ## Evaluation
-TODO
+
+Table
+
+| Model | Identities | Training Dataset | Test Dataset | Accuracy | AUC | Parameters | 
+| --------------- | --------------- | --------------- |  --------------- | --------------- | --------------- | --------------- |
+| SlowFast R-50 | 1 | ForgeryNet | ForgeryNet | 88.78 | 93.88 | 33.6M |
+| TSM | 1 | ForgeryNet | ForgeryNet | 88.04 | 93.05 | 33.6M |
+| MINTIME | 1 | ForgeryNet | ForgeryNet | 78.10 | 85.95 | ??? |
+| MINTIME | 2 | ForgeryNet | ForgeryNet | 78.64 | 86.44 | ??? |
+| MINTIME | 3 | ForgeryNet | ForgeryNet | 78.46 | 86.30 | ??? |
+| EfficientNet-B0 + MLP | 2 | ForgeryNet | ForgeryNet | ??? | ??? | ??? |
+| MINTIME | 1 | DFDC | DFDC | ??? | ??? | ??? |
+| MINTIME | 2 | DFDC | DFDC | ??? | ??? | ??? |
+| EfficientNet-B0 + MLP | 2 | DFDC | DFDC | ??? | ??? | ??? |
+
 
 ### Baseline 
 To validate the real effectiveness of the implementation choices made on the presented architecture, we also conducted some alternative architecture training. In particular, the simplest of the two consists of a freezed EfficientNet-B0 pre-trained on the DFDC and FaceForensics++ datasets but whose output features, instead of going into a Transformer as in the original architecture, are given as input directly to a simple MLP. 

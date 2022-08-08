@@ -11,8 +11,7 @@ from torch.utils.data.dataloader import DataLoader
 from tqdm import tqdm
 import pandas as pd
 import face_detector
-from face_detector import VideoDataset
-from face_detector import VideoFaceDetector
+from face_detector import VideoDataset, VideoFaceDetector
 import argparse
 
 
@@ -34,7 +33,6 @@ def process_videos(videos, detector_cls: Type[VideoFaceDetector], opt):
         out_dir = out_dir.replace("video.mp4", '')
 
         # Skip already detected videos to improve speed
-        
         if os.path.exists(out_dir) and "video.json" in os.listdir(out_dir):
             continue
         

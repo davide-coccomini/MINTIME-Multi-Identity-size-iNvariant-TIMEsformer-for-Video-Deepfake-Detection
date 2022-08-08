@@ -78,7 +78,6 @@ if __name__ == '__main__':
                 faces.append(face)
                 mapping[index] = face_path
                
-            
 
             
             # Extract the embeddings

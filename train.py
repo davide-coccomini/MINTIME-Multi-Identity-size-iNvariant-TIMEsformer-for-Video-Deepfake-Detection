@@ -85,13 +85,17 @@ if __name__ == "__main__":
         raise Exception("Invalid number of frames.")
         
     # Setup CUDA settings
-    torch.cuda.set_device(opt.gpu_id) 
+    if opt.gpu_id == -1:
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    else:
+        device = opt.gpu_id
+    #torch.cuda.set_device(device) 
     torch.backends.cudnn.deterministic = True
     random.seed(opt.random_state)
     torch.manual_seed(opt.random_state)
     torch.cuda.manual_seed(opt.random_state)
     np.random.seed(opt.random_state)
-   
+
     # Create useful dirs
     os.makedirs(opt.logger_name, exist_ok=True)
     os.makedirs(opt.models_output_path, exist_ok=True)
@@ -108,7 +112,7 @@ if __name__ == "__main__":
     if opt.model == 0:
         model = Baseline(config=config)
         num_patches = None
-    else:
+    else:   
         model = SizeInvariantTimeSformer(config=config)
         num_patches = config['model']['num-patches']
 
@@ -126,11 +130,10 @@ if __name__ == "__main__":
                         param.requires_grad = False
 
     # Move models to GPU 
-    features_extractor = features_extractor.to(opt.gpu_id)    
-    model = model.to(opt.gpu_id)
+    features_extractor = features_extractor.to(device)    
+    model = model.to(device)
     model.train()
     
-
     # Init optimizers
     if opt.freeze_backbone:
         parameters = model.parameters()
@@ -233,6 +236,13 @@ if __name__ == "__main__":
     else:
         print("No checkpoint loaded for the model.")
 
+
+    
+    if opt.gpu_id == -1:
+        features_extractor = torch.nn.DataParallel(features_extractor)
+        model = torch.nn.DataParallel(model)
+
+
     # Init variables for training
     not_improved_loss = 0
     previous_loss = math.inf
@@ -261,16 +271,23 @@ if __name__ == "__main__":
             start_time = datetime.now()
             b, f, h, w, c = videos.shape
             labels = labels.unsqueeze(1).float()
-            videos = videos.to(opt.gpu_id)
-            identities_masks = identities_masks.to(opt.gpu_id)
-            masks = masks.to(opt.gpu_id)
-            positions = positions.to(opt.gpu_id)
+            videos = videos.to(device)
+            identities_masks = identities_masks.to(device)
+            masks = masks.to(device)
+            positions = positions.to(device)
             videos = rearrange(videos, "b f h w c -> (b f) c h w")
             if opt.freeze_backbone:
                 with torch.no_grad():
-                    features = features_extractor.extract_features(videos)  
+                    if opt.gpu_id == -1:
+                        features = features_extractor.module.extract_features(videos) 
+                    else:
+                        features = features_extractor.extract_features(videos)  
             else:
-                features = features_extractor.extract_features(videos)  
+                if opt.gpu_id == -1:
+                    features = features_extractor.module.extract_features(videos)  
+                else:
+                    features = features_extractor.extract_features(videos) 
+
             if opt.model == 0: # Baseline
                 y_pred = model(features)
                 y_pred = torch.mean(y_pred.reshape(-1, config["model"]["num-frames"]), axis=1).unsqueeze(1)
@@ -321,10 +338,10 @@ if __name__ == "__main__":
         # Epoch validation loop
         for index, (videos, size_embeddings, masks, identities_masks, positions, labels) in enumerate(val_dl):
             b, f, _, _, _= videos.shape
-            videos = videos.to(opt.gpu_id)
-            masks = masks.to(opt.gpu_id)
-            positions = positions.to(opt.gpu_id)
-            identities_masks = identities_masks.to(opt.gpu_id)
+            videos = videos.to(device)
+            masks = masks.to(device)
+            positions = positions.to(device)
+            identities_masks = identities_masks.to(device)
             labels = labels.unsqueeze(1).float()
 
             # Do not update the gradient during validation

@@ -17,6 +17,7 @@ The special features of our proposal are as follows:
 - Introduction of a new embedding technique, namely size-embedding, to induce face-frame area ratio information to the TimeSformer;
 - Implementation of a final module for video-level classification in the presence of multiple faces to handle these particular cases as well.
 
+
 ## Setup
 Clone the repository and move into it:
 
@@ -34,7 +35,8 @@ conda activate deepfakes
 export PYTHONPATH=.
 ```
 
-## Detect fakes in a video
+
+## Run Deepfake Detection on a video
 If you want to directly classify a video using pre-trained models, you can download the weights from the model zoo and use the following command:
 
 ```
@@ -44,8 +46,10 @@ python3 predict.py --video_path path/to/video.mp4 --model_weights path/to/model_
 The output video will be stored in the examples/preds folder:
 ![Prediction Example](images/example_detection.gif)
 
-## Model ZOO
+For purposes of explainability the attention maps on the various slots of the input sequence are also saved. These are used to work out, in the multi-identity case, which identity is fake in each frame.
 
+
+## Model ZOO
 
 | Model | Identities | Training Dataset | Test Dataset | Accuracy | AUC | Parameters |  Weights |
 | --------------- | --------------- | --------------- |  --------------- | --------------- | --------------- | --------------- | --------------- |
@@ -59,8 +63,8 @@ The output video will be stored in the examples/preds folder:
 | MINTIME | 2 | DFDC | DFDC | ??? | ??? | ??? | LINK |
 | EfficientNet-B0 + MLP | 2 | DFDC | DFDC | ??? | ??? | ??? | LINK |
 
-## Dataset
 
+## Dataset
 In order to conduct our research, it was necessary to analyse the various datasets in circulation in order to identify the one with the following characteristics:
 - Containing a sufficient number of videos for effective training;
 - Presence of multi-faces videos;
@@ -86,7 +90,6 @@ In order to use the proposed model, some preprocessing steps are required to con
 In case you want to retrain the convolutional backbone patch extraction the preprocessing of DFDC and FaceForensics++ datasets, the procedure is described in <a href=https://github.com/davide-coccomini/Combining-EfficientNet-and-Vision-Transformers-for-Video-Deepfake-Detection>this repository</a>. Otherwise you can directly use the pretrained model as explained in the training section.
 
 ### Face Detection and Extraction
-
 To perform deepfake detection it is necessary to first identify and extract faces from all the videos in the dataset.
 Detect the faces inside the videos:
 ```
@@ -219,7 +222,6 @@ The dataset at the end of this process will have the following structure:
 ```
 
 ### Identity Clustering
-
 Having to manage multi-face videos and wanting to detect temporal and not just spatial anomalies, it is necessary to clustered the faces in each video on the basis of their similarity and maintaining the temporal order of their appearance in the frames. To do this, a clustering algorithm was developed that groups the faces extracted from the videos into sequences. 
 
 To run the clustering split use the following commands:
@@ -323,7 +325,6 @@ The number of frames per video, and thus consecutive faces to be considered for 
  
 
 ### Adaptive Input Sequence Assignment
-
 To enable the model to handle multiple identities within one video, the number of available frames is divided among the identities of the video.
 The maximum number of identities per video is set via the max-identities parameter in the configuration file.
 
@@ -347,7 +348,6 @@ In example number two, however, although the two identities have the same number
 
 ### Identity-based Attention Calculation
 For our TimeSformer we apply the version of attention that was most effective in the original paper, namely Divided Space-Time Attention. Attention is calculated spatially between all patches in the same frame, but is then also calculated between the corresponding patches in the next and previous frames using a moving window. 
-
 
 ![Divided Space-Time Attention](images/divided_space_time_attention.gif)
 
@@ -373,19 +373,11 @@ python3 train.py --config config/size_invariant_timesformer.yaml --model 1 --tra
 The following parameters can be changed as desired to perform different training:
 - --num_epochs: Number of training epochs (default: 300);
 - --resume: Path to latest checkpoint (default: none);
-- --random_state: Random state number for reproducibility (default: 42)
 - --freeze_backbone: Maintain the network freezed or train it (default: False);
 - --extractor_unfreeze_blocks: Number of blocks to train in the backbone (default: All);
 - --max_videos: Maximum number of videos to use for training (default: all);
 - --patience: How many epochs wait before stopping for validation loss not improving (default: 5);
 - --logger_name: Path to the folder for tensorboard logging (default: runs/train);
-
-## Amost always imports
-
-|  R |  Python |    Matlab |
-| --------- |:---|:---------|:-----|
-| library(tidyverse) |import numpy as np|
-
 
 
 ### Baseline 
@@ -394,12 +386,22 @@ To validate the real effectiveness of the implementation choices made on the pre
 
 The MLP performs frame-by-frame classification for each face of the video and the predictions are then averaged and evaluated against a fixed threshold. 
 
+
+## Inference
+To run the evaluation process of a trained model on a test set, use the following command:
+```
+test.py --model_weights path/to/model  --extractor_weights path/to/model --video_path path/to/videos --data_path path/to/faces --test_list_file path/to/test.csv --model model_type --config path/to/config
+```
+
+You can also use the option --save_attentions to save space, time and combined attention plots.
+
+
 ## Additional Parameters
-In all the scripts the following parameters can be also customized:
+In almost all the scripts the following parameters can be also customized:
 
-- --gpu_id: ID of GPU to use for processing (default: 0);
+- --gpu_id: ID of GPU to use for processing or -1 to use multi-gpu only for the training (default: 0);
 - --workers: Number of data loader workers (default: 8);
-
+- --random_state: Random state number for reproducibility (default: 42)
 
 # Reference
 TODO

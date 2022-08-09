@@ -76,10 +76,9 @@ def save_attention_plots(aggregated_attentions, identity_names, frames_per_ident
     for index, tokens_means in enumerate(aggregated_attentions):
         plt.bar([i+1 for i in range(num_frames)], tokens_means)
         for i in range(len(frames_per_identity)):
-            plt.vlines(frames_per_identity[i], ymin=min(tokens_means), ymax=max(tokens_means), colors=colors[i], label = str(identity_names[i][0]))
+            plt.vlines(frames_per_identity[i], ymin=min(tokens_means), ymax=max(tokens_means), colors=colors[i], label = str(identity_names[i]))
         plt.legend()
-        if len(frames_per_identity) > 1:
-            plt.savefig("outputs/tokens/" + video_id + "_" + PLOTS_NAMES[index] + ".jpg")
+        plt.savefig("outputs/tokens/" + video_id + "_" + PLOTS_NAMES[index] + ".jpg")
         plt.clf()
 
 

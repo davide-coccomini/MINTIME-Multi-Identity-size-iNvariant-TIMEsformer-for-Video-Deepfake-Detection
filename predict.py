@@ -26,7 +26,7 @@ from models.efficientnet.efficientnet_pytorch import EfficientNet
 from models.baseline import Baseline
 import os
 from einops import rearrange
-from utils import aggregate_attentions, draw_border
+from utils import aggregate_attentions, draw_border, save_attention_plots
 
 
 
@@ -391,11 +391,14 @@ def predict(video_path, clustered_faces, config, opt, discarded_faces = None):
         features = rearrange(features, '(b f) c h w -> b f c h w', b = b, f = f)   
         test_pred, attentions = model(features, mask=mask, size_embedding=size_embeddings, identities_mask=identities_mask, positions=positions)
         
+        identity_names = [row[0] for row in tokens_per_identity]
         frames_per_identity = [int(row[1] / config["model"]["num-patches"]) for row in tokens_per_identity]
         
         aggregated_attentions, identity_attentions = aggregate_attentions(attentions, config['model']['heads'], config['model']['num-frames'], frames_per_identity)
-        
-        return torch.sigmoid(test_pred[0]).item(), identity_attentions, identities
+
+        save_attention_plots(aggregated_attentions, identity_names, frames_per_identity, config['model']['num-frames'], os.path.basename(video_path))
+
+        return torch.sigmoid(test_pred[0]).item(), identity_attentions, aggregated_attentions, identities, frames_per_identity
 
 def get_identities_bboxes(identities):
     identities_bboxes = {}
@@ -410,9 +413,11 @@ def get_identities_bboxes(identities):
     return identities_bboxes
 
 
-def generate_output_video(video_path, pred, attentions, identities):
+def generate_output_video(video_path, pred, identity_attentions, aggregated_attentions, identities, frames_per_identity):
 
     identities_bboxes = get_identities_bboxes(identities)
+    available_frames_keys = [frame for frame in identities_bboxes]
+
     cap = cv2.VideoCapture(video_path)
     width  = cap.get(3)  
     height = cap.get(4) 
@@ -420,22 +425,20 @@ def generate_output_video(video_path, pred, attentions, identities):
     fourcc = hex(int(cap.get(cv2.CAP_PROP_FOURCC)))
     output = cv2.VideoWriter("examples/preds/"+str(os.path.basename(video_path).replace(".mp4", ".avi")), cv2.VideoWriter_fourcc("X", "V", "I", "D"), fps, (int(width), int(height)))
     frame_index = 0
-    available_frames_keys = [frame for frame in identities_bboxes]
     while True:
         ret, frame = cap.read()
         if ret:
-            nearest_frame_index = min(available_frames_keys, key=lambda x:abs(x-frame_index))
+            nearest_frame_index = min(available_frames_keys, key=lambda x:abs(x - frame_index))
             if nearest_frame_index - frame_index > fps: 
                 continue
 
-            bbox = identities_bboxes[nearest_frame_index]
-        
-            
+            bbox = identities_bboxes[nearest_frame_index] 
                 
             for identity_index, identity_bbox in enumerate(bbox):
+                
                 xmin, ymin, xmax, ymax = [int(b * 2) for b in identity_bbox]
                 if pred > 0.5:
-                    red = 255 * attentions[identity_index]
+                    red = 255 * identity_attentions[identity_index]
                     green = 255 - red
 
                     if red > green:
@@ -520,10 +523,10 @@ if __name__ == "__main__":
 
 
     print("Searching for fakes in the video...")
-    pred, attentions, identities = predict(opt.video_path, clustered_faces, config, opt)
+    pred, identity_attentions, aggregated_attentions, identities, frames_per_identity = predict(opt.video_path, clustered_faces, config, opt)
     if pred > 0.5:
         print("The video is fake ("+str(round(pred*100,2)) + "%), showing video result...")
     else:
         print("The video is pristine ("+str(round((1-pred)*100,2)) + "%), showing video result...")
 
-    generate_output_video(opt.video_path, pred, attentions, identities)
+    generate_output_video(opt.video_path, pred, identity_attentions, aggregated_attentions, identities, frames_per_identity)

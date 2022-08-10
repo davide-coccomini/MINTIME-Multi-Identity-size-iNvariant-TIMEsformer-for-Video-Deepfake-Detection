@@ -30,7 +30,7 @@ RANGE_SIZE = 5
 SIZE_EMB_DICT = [(1+i*RANGE_SIZE, (i+1)*RANGE_SIZE) if i != 0 else (0, RANGE_SIZE) for i in range(20)]
 
 class DeepFakesDataset(Dataset):
-    def __init__(self, videos_paths, labels, data_path, video_path, image_size, multiclass_labels = None, mode = 'train', model = 0, num_frames = 8, max_identities = 3, num_patches=49):
+    def __init__(self, videos_paths, labels, data_path, video_path, image_size, augmentation = None, multiclass_labels = None, mode = 'train', model = 0, num_frames = 8, max_identities = 3, num_patches=49):
         self.x = videos_paths
         self.y = labels
         self.multiclass_labels = multiclass_labels
@@ -44,39 +44,58 @@ class DeepFakesDataset(Dataset):
         self.num_frames = num_frames
         self.num_patches = num_patches
         self.max_identities = max_identities
+        self.augmentation = augmentation
         self.max_faces_per_identity = {1: [num_frames], 
                   2:  [int(num_frames/2), int(num_frames/2)],
                   3:  [int(num_frames/3), int(num_frames/3), int(num_frames/4)],
                   4:  [int(num_frames/3), int(num_frames/3), int(num_frames/8), int(num_frames/8)]}
 
     
-    def create_train_transforms(self, size, additional_targets):
-        return Compose([
-            OneOf([
-                IsotropicResize(max_side=size, interpolation_down=cv2.INTER_AREA, interpolation_up=cv2.INTER_CUBIC),
-                IsotropicResize(max_side=size, interpolation_down=cv2.INTER_AREA, interpolation_up=cv2.INTER_LINEAR),
-                IsotropicResize(max_side=size, interpolation_down=cv2.INTER_LINEAR, interpolation_up=cv2.INTER_LINEAR),
-            ], p=1),
-            PadIfNeeded(min_height=size, min_width=size, border_mode=cv2.BORDER_CONSTANT),
-            Resize(height=size, width=size),
-            ImageCompression(quality_lower=60, quality_upper=100, p=0.2),
-            OneOf([GaussianBlur(blur_limit=3), MedianBlur(), GlassBlur(), MotionBlur()], p=0.1),
-            OneOf([HorizontalFlip(), InvertImg()], p=0.5),
-            OneOf([RandomBrightnessContrast(), RandomContrast(), RandomBrightness()], p=0.4),
-            OneOf([FancyPCA(), HueSaturationValue()], p=0.1),
-            OneOf([RGBShift(), ColorJitter()], p=0.1),
-            OneOf([MultiplicativeNoise(), ISONoise(), GaussNoise()], p=0.3),
-            OneOf([Cutout(), CoarseDropout()], p=0.1),
-            OneOf([RandomFog(), RandomRain(), RandomSunFlare()], p=0.02),
-            RandomShadow(p=0.05),
-            RandomGamma(p=0.1),
-            CLAHE(p=0.05),
-            ToGray(p=0.2),
-            ToSepia(p=0.05),
-            ShiftScaleRotate(shift_limit=0.1, scale_limit=0.2, rotate_limit=5, border_mode=cv2.BORDER_CONSTANT, p=0.5),
-        ], additional_targets = additional_targets
-        )
-        
+    def create_train_transforms(self, size, additional_targets, augmentation):
+        if augmentation == "min":
+            return Compose([
+                OneOf([
+                    IsotropicResize(max_side=size, interpolation_down=cv2.INTER_AREA, interpolation_up=cv2.INTER_CUBIC),
+                    IsotropicResize(max_side=size, interpolation_down=cv2.INTER_AREA, interpolation_up=cv2.INTER_LINEAR),
+                    IsotropicResize(max_side=size, interpolation_down=cv2.INTER_LINEAR, interpolation_up=cv2.INTER_LINEAR),
+                ], p=1),
+                PadIfNeeded(min_height=size, min_width=size, border_mode=cv2.BORDER_CONSTANT),
+                Resize(height=size, width=size),
+                ImageCompression(quality_lower=60, quality_upper=100, p=0.2),
+                GaussNoise(p=0.3),
+                GaussianBlur(blur_limit=3, p=0.05),
+                HorizontalFlip(),
+                OneOf([RandomBrightnessContrast(), FancyPCA(), HueSaturationValue()], p=0.4),
+                ToGray(p=0.2),
+                ShiftScaleRotate(shift_limit=0.1, scale_limit=0.2, rotate_limit=5, border_mode=cv2.BORDER_CONSTANT, p=0.5),
+            ], additional_targets = additional_targets
+            )
+        else:
+            return Compose([
+                OneOf([
+                    IsotropicResize(max_side=size, interpolation_down=cv2.INTER_AREA, interpolation_up=cv2.INTER_CUBIC),
+                    IsotropicResize(max_side=size, interpolation_down=cv2.INTER_AREA, interpolation_up=cv2.INTER_LINEAR),
+                    IsotropicResize(max_side=size, interpolation_down=cv2.INTER_LINEAR, interpolation_up=cv2.INTER_LINEAR),
+                ], p=1),
+                PadIfNeeded(min_height=size, min_width=size, border_mode=cv2.BORDER_CONSTANT),
+                Resize(height=size, width=size),
+                ImageCompression(quality_lower=60, quality_upper=100, p=0.2),
+                OneOf([GaussianBlur(blur_limit=3), MedianBlur(), GlassBlur(), MotionBlur()], p=0.1),
+                OneOf([HorizontalFlip(), InvertImg()], p=0.5),
+                OneOf([RandomBrightnessContrast(), RandomContrast(), RandomBrightness(), FancyPCA(), HueSaturationValue()], p=0.5),
+                OneOf([RGBShift(), ColorJitter()], p=0.1),
+                OneOf([MultiplicativeNoise(), ISONoise(), GaussNoise()], p=0.3),
+                OneOf([Cutout(), CoarseDropout()], p=0.1),
+                OneOf([RandomFog(), RandomRain(), RandomSunFlare()], p=0.02),
+                RandomShadow(p=0.05),
+                RandomGamma(p=0.1),
+                CLAHE(p=0.05),
+                ToGray(p=0.2),
+                ToSepia(p=0.05),
+                ShiftScaleRotate(shift_limit=0.1, scale_limit=0.2, rotate_limit=5, border_mode=cv2.BORDER_CONSTANT, p=0.5),
+            ], additional_targets = additional_targets
+            )
+            
     def create_val_transform(self, size, additional_targets):
         return Compose([
             IsotropicResize(max_side=size, interpolation_down=cv2.INTER_AREA, interpolation_up=cv2.INTER_CUBIC),
@@ -257,7 +276,7 @@ class DeepFakesDataset(Dataset):
         additional_targets = dict(zip(additional_targets_keys, additional_targets_values))
 
         if self.mode == 'train':
-            transform = self.create_train_transforms(self.image_size, additional_targets)
+            transform = self.create_train_transforms(self.image_size, additional_targets, self.augmentation)
         else:
             transform = self.create_val_transform(self.image_size, additional_targets)  
         if len(sequence) == 8:

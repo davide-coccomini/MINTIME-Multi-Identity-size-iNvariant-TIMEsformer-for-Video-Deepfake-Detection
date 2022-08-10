@@ -7,6 +7,7 @@ training:
   scheduler: 'cosinelr' 
   gamma: 0.1
   step-size: 5
+  augmentation: 'max'
 
 test:
   bs: 1

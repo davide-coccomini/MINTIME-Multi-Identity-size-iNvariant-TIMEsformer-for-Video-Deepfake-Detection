@@ -122,12 +122,16 @@ if __name__ == "__main__":
     else:
         features_extractor.train()
         if opt.extractor_unfreeze_blocks > -1:
-            for i in range(0, len(features_extractor._blocks)):
-                for index, param in enumerate(features_extractor._blocks[i].parameters()):
-                    if i >= len(features_extractor._blocks)-opt.extractor_unfreeze_blocks:
+            for name, param in features_extractor.named_parameters():
+                if "blocks" in name:
+                    param_block = int(name.split(".")[1])
+                    if param_block >= 16 - opt.extractor_unfreeze_blocks:
                         param.requires_grad = True
                     else:
                         param.requires_grad = False
+                else:                    
+                    param.requires_grad = False
+
 
     # Move models to GPU 
     features_extractor = features_extractor.to(device)    
@@ -278,15 +282,9 @@ if __name__ == "__main__":
             videos = rearrange(videos, "b f h w c -> (b f) c h w")
             if opt.freeze_backbone:
                 with torch.no_grad():
-                    if opt.gpu_id == -1:
-                        features = features_extractor.module.extract_features(videos) 
-                    else:
-                        features = features_extractor.extract_features(videos)  
+                    features = features_extractor(videos)  
             else:
-                if opt.gpu_id == -1:
-                    features = features_extractor.module.extract_features(videos)  
-                else:
-                    features = features_extractor.extract_features(videos) 
+                features = features_extractor(videos) 
 
             if opt.model == 0: # Baseline
                 y_pred = model(features)

@@ -6,7 +6,7 @@ import argparse
 from tqdm import tqdm
 import math
 import yaml
-from utils import check_correct
+from utils import check_correct, unix_time_millis
 from torch.optim.lr_scheduler import LambdaLR
 from datetime import datetime, timedelta
 from statistics import mean
@@ -264,7 +264,7 @@ if __name__ == "__main__":
         train_correct = 0
         positive = 0
         negative = 0
-        times_per_batch = 0
+        times_per_batch = []
         train_batches = len(train_dl)
         val_batches = len(val_dl)
         total_batches = train_batches + val_batches
@@ -312,13 +312,12 @@ if __name__ == "__main__":
                 lr_scheduler.step_update((t * (train_batches) + index))
 
             # Update time per epoch
-            time_diff = datetime.now()-start_time
-            duration = float(str(time_diff.seconds) + "." +str(time_diff.microseconds))
-            times_per_batch += duration
+            time_diff = datetime.now() - start_time
+            times_per_batch.append(unix_time_millis(time_diff))
             
             # Print intermediate metrics
             if index%100 == 0:
-                expected_time = str(timedelta(seconds=(times_per_batch / (index+1))*total_batches-index))
+                expected_time = str(datetime.fromtimestamp(mean(times_per_batch)*(total_batches-index)/1000).strftime('%H:%M:%S.%f'))
                 print("\nLoss: ", total_loss/counter, "Accuracy: ", train_correct/(counter*config['training']['bs']) ,"Train 0s: ", negative, "Train 1s:", positive, "Expected Time:", expected_time)
 
             bar.next()

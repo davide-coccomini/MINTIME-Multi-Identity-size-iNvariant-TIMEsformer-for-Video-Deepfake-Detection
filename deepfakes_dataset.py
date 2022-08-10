@@ -13,7 +13,7 @@ import numpy as np
 from datetime import datetime
 import os
 import magic
-from albumentations import Compose, RandomBrightnessContrast, HorizontalFlip, FancyPCA, HueSaturationValue, OneOf, ToGray, ShiftScaleRotate, ImageCompression, PadIfNeeded, GaussNoise, GaussianBlur, Rotate, Normalize, Resize
+from albumentations import Cutout, CoarseDropout, RandomGamma, MedianBlur, ToSepia, RandomShadow, MultiplicativeNoise, RandomSunFlare, GlassBlur, RandomBrightness, MotionBlur, RandomRain, RGBShift, RandomFog, RandomContrast, Downscale, InvertImg, RandomContrast, ColorJitter, Compose, RandomBrightnessContrast, CLAHE, ISONoise, JpegCompression, HorizontalFlip, FancyPCA, HueSaturationValue, OneOf, ToGray, ShiftScaleRotate, ImageCompression, PadIfNeeded, GaussNoise, GaussianBlur, Rotate, Normalize, Resize
 from PIL import Image
 from transforms.albu import IsotropicResize
 from concurrent.futures import ThreadPoolExecutor
@@ -60,11 +60,19 @@ class DeepFakesDataset(Dataset):
             PadIfNeeded(min_height=size, min_width=size, border_mode=cv2.BORDER_CONSTANT),
             Resize(height=size, width=size),
             ImageCompression(quality_lower=60, quality_upper=100, p=0.2),
-            GaussNoise(p=0.3),
-            GaussianBlur(blur_limit=3, p=0.05),
-            HorizontalFlip(),
-            OneOf([RandomBrightnessContrast(), FancyPCA(), HueSaturationValue()], p=0.4),
+            OneOf([GaussianBlur(blur_limit=3), MedianBlur(), GlassBlur(), MotionBlur()], p=0.1),
+            OneOf([HorizontalFlip(), InvertImg()], p=0.5),
+            OneOf([RandomBrightnessContrast(), RandomContrast(), RandomBrightness()], p=0.4),
+            OneOf([FancyPCA(), HueSaturationValue()], p=0.1),
+            OneOf([RGBShift(), ColorJitter()], p=0.1),
+            OneOf([MultiplicativeNoise(), ISONoise(), GaussNoise()], p=0.3),
+            OneOf([Cutout(), CoarseDropout()], p=0.1),
+            OneOf([RandomFog(), RandomRain(), RandomSunFlare()], p=0.02),
+            RandomShadow(p=0.05),
+            RandomGamma(p=0.1),
+            CLAHE(p=0.05),
             ToGray(p=0.2),
+            ToSepia(p=0.05),
             ShiftScaleRotate(shift_limit=0.1, scale_limit=0.2, rotate_limit=5, border_mode=cv2.BORDER_CONSTANT, p=0.5),
         ], additional_targets = additional_targets
         )

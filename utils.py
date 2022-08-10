@@ -8,6 +8,7 @@ from scipy.special import softmax
 from einops import rearrange
 from statistics import mean
 import cv2
+import datetime
 
 PLOTS_NAMES = ["space", "time", "combined"]
 
@@ -34,6 +35,11 @@ def check_correct(preds, labels, multiclass_labels = None, multiclass_errors = N
         return correct, positive_class, negative_class, multiclass_errors
     else:
         return correct, positive_class, negative_class
+
+
+def unix_time_millis(dt):
+    return dt.total_seconds() * 1000.0
+
 
 def multiple_lists_mean(a):
     return sum(a) / len(a)

@@ -155,6 +155,7 @@ if __name__ == "__main__":
     
     bar = ChargingBar('PREDICT', max=(len(test_dl)))
     preds = []
+    videos_errors = []
 
     # Test loop
     for index, (videos, size_embeddings, masks, identities_masks, positions, tokens_per_identity, labels, multiclass_labels, video_ids) in enumerate(test_dl):
@@ -165,10 +166,9 @@ if __name__ == "__main__":
         masks = masks.to(opt.gpu_id)
         positions = positions.to(opt.gpu_id)
 
-        
         with torch.no_grad():
             videos = rearrange(videos, "b f h w c -> (b f) c h w")
-            features = features_extractor.extract_features(videos)  
+            features = features_extractor(videos)  
 
             if opt.model == 0: 
                 test_pred = model(features)
@@ -190,7 +190,8 @@ if __name__ == "__main__":
         test_pred = test_pred.cpu()
         test_loss = loss_fn(test_pred, labels)
         total_test_loss += round(test_loss.item(), 2)
-        corrects, positive_class, negative_class, multiclass_errors = check_correct(test_pred, labels, multiclass_labels, multiclass_errors)
+        corrects, positive_class, negative_class, multiclass_errors, batch_errors = check_correct(test_pred, labels, multiclass_labels, multiclass_errors, video_ids)
+        videos_errors.extend(batch_errors)
         test_correct += corrects
         test_positive += positive_class
         test_counter += 1
@@ -204,7 +205,7 @@ if __name__ == "__main__":
     bar.finish()
     total_test_loss /= test_counter
     test_correct /= test_samples
-
+    print("Videos errors", videos_errors)
     print("Class errors", multiclass_errors)
     print(str(opt.model_weights) + " test loss:" +
             str(total_test_loss) + " test accuracy:" + str(test_correct) + " test_0s:" + str(test_negative) + "/" + str(test_counters[0]) + " test_1s:" + str(test_positive) + "/" + str(test_counters[1]) + " AUC " + str(auc))

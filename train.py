@@ -89,7 +89,7 @@ if __name__ == "__main__":
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     else:
         device = opt.gpu_id
-    #torch.cuda.set_device(device) 
+
     torch.backends.cudnn.deterministic = True
     random.seed(opt.random_state)
     torch.manual_seed(opt.random_state)
@@ -202,7 +202,7 @@ if __name__ == "__main__":
     loss_fn = torch.nn.BCEWithLogitsLoss(pos_weight=torch.tensor([class_weights]))
 
     # Create the data loaders 
-    train_dataset = DeepFakesDataset(train_videos, train_labels, image_size=config['model']['image-size'], data_path=opt.data_path, video_path=opt.video_path, num_frames=config['model']['num-frames'], num_patches=num_patches, max_identities=config['model']['max-identities'])
+    train_dataset = DeepFakesDataset(train_videos, train_labels, augmentation=config['training']['augmentation'], image_size=config['model']['image-size'], data_path=opt.data_path, video_path=opt.video_path, num_frames=config['model']['num-frames'], num_patches=num_patches, max_identities=config['model']['max-identities'])
     train_dl = torch.utils.data.DataLoader(train_dataset, batch_size=config['training']['bs'], shuffle=True, sampler=None,
                                  batch_sampler=None, num_workers=opt.workers, collate_fn=None,
                                  pin_memory=False, drop_last=False, timeout=0,
@@ -264,7 +264,6 @@ if __name__ == "__main__":
         train_correct = 0
         positive = 0
         negative = 0
-        times_per_batch = []
         train_batches = len(train_dl)
         val_batches = len(val_dl)
         total_batches = train_batches + val_batches
@@ -312,12 +311,11 @@ if __name__ == "__main__":
                 lr_scheduler.step_update((t * (train_batches) + index))
 
             # Update time per epoch
-            time_diff = datetime.now() - start_time
-            times_per_batch.append(unix_time_millis(time_diff))
+            time_diff = unix_time_millis(datetime.now() - start_time)
             
             # Print intermediate metrics
             if index%100 == 0:
-                expected_time = str(datetime.fromtimestamp(mean(times_per_batch)*(total_batches-index)/1000).strftime('%H:%M:%S.%f'))
+                expected_time = str(datetime.fromtimestamp((time_diff)*(total_batches-index)/1000).strftime('%H:%M:%S.%f'))
                 print("\nLoss: ", total_loss/counter, "Accuracy: ", train_correct/(counter*config['training']['bs']) ,"Train 0s: ", negative, "Train 1s:", positive, "Expected Time:", expected_time)
 
             bar.next()
@@ -345,12 +343,12 @@ if __name__ == "__main__":
             with torch.no_grad():
                 if opt.model == 0: 
                     videos = rearrange(videos, 'b f h w c -> (b f) c h w')  
-                    features = features_extractor.extract_features(videos)  
+                    features = features_extractor(videos)  
                     val_pred = model(features)
                     val_pred = torch.mean(val_pred.reshape(-1, config["model"]["num-frames"]), axis=1).unsqueeze(1)
                 elif opt.model == 1:
                     videos = rearrange(videos, 'b f h w c -> (b f) c h w')                                       # B*8 x 3 x 224 x 224
-                    features = features_extractor.extract_features(videos)                                           # B*8 x 1280 x 7 x 7
+                    features = features_extractor(videos)                                           # B*8 x 1280 x 7 x 7
                     features = rearrange(features, '(b f) c h w -> b f c h w', b = b, f = f)   
                     val_pred = model(features, mask=masks, size_embedding=size_embeddings, identities_mask=identities_masks, positions=positions)
 
@@ -385,7 +383,7 @@ if __name__ == "__main__":
         # Save checkpoint if the model's validation loss is improving
         if previous_loss > total_val_loss:
             torch.save(features_extractor.state_dict(), os.path.join(opt.models_output_path,  "EfficientNetExtractor_checkpoint" + str(t)))
-            torch.save(model.state_dict(), os.path.join(opt.models_output_path,  "SizeInvariantTimeSformer_checkpoint" + str(t)))
+            torch.save(model.state_dict(), os.path.join(opt.models_output_path,  "Model_checkpoint" + str(t)))
 
         previous_loss = total_val_loss
         # Log some metrics into Tensorboard

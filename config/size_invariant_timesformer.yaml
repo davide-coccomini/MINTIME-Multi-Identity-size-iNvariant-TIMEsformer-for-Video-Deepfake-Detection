@@ -7,7 +7,7 @@ training:
   scheduler: 'cosinelr' 
   gamma: 0.1
   step-size: 5
-  augmentation: 'max'
+  augmentation: 'max' # min/max
 
 test:
   bs: 1
@@ -20,7 +20,7 @@ model:
   num-frames: 16
   max-identities: 2
   dim: 512
-  depth: 9
+  depth: 9 # 9 v2 3 v3
   dim-head: 64
   channels: 1280
   heads: 8

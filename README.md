@@ -15,7 +15,7 @@ The special features of our proposal are as follows:
 - Exploitation of an EfficientNet B0 as a pre-trained patch extractor on Deepfake Detection tasks. This module provides a lightweight, trainable and efficient method of patch extraction compared to the traditional input image split used in Vision Transformers;
 - Using a TimeSformer as a Transformer module in order to also capture time variations within a video;
 - Introduction of a new embedding technique, namely size-embedding, to induce face-frame area ratio information to the TimeSformer;
-- Implementation of a final module for video-level classification in the presence of multiple faces to handle these particular cases as well.
+- Use of novels positional embedding, attention calculation and input sequence generation to enable a TimeSformer to handle multiple identities in the same video.
 
 
 ## Setup
@@ -373,6 +373,7 @@ python3 train.py --config config/size_invariant_timesformer.yaml --model 1 --tra
 The following parameters can be changed as desired to perform different training:
 - --num_epochs: Number of training epochs (default: 300);
 - --resume: Path to latest checkpoint (default: none);
+- --restore_epoch: Restart from the checkpoint's epoch if --resume option specified (default: False)
 - --freeze_backbone: Maintain the network freezed or train it (default: False);
 - --extractor_unfreeze_blocks: Number of blocks to train in the backbone (default: All);
 - --max_videos: Maximum number of videos to use for training (default: all);

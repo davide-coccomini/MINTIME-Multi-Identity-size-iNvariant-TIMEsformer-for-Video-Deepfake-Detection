@@ -44,6 +44,8 @@ if __name__ == "__main__":
                         help='Path to the dataset converted into identities.')
     parser.add_argument('--video_path', default="../datasets/ForgeryNet/videos", type=str,
                         help='Path to the dataset original videos (.mp4 files).')
+    parser.add_argument('--deepfake_methods', nargs='*', required=False,
+                        help="For ForgeryNet dataset, filter some deepfake methods for partial training.")
     parser.add_argument('--num_epochs', default=30, type=int,
                         help='Number of training epochs.')
     parser.add_argument('--workers', default=8, type=int,
@@ -165,9 +167,29 @@ if __name__ == "__main__":
     df_train = df_train.sample(frac=1, random_state=opt.random_state).reset_index(drop=True)
     df_validation = df_validation.sample(frac=1, random_state=opt.random_state).reset_index(drop=True)
 
+
+    # Remove the videos without face detection from the list
+    for df in [df_train df_validation]:
+        indexes_to_drop = []
+        for index, row in df.iterrows():
+            video_path = os.path.join(opt.data_path, row["video"])
+            if not os.path.exists(video_path) or len(os.listdir(video_path)) == 0:
+                indexes_to_drop.append(index)
+        df.drop(df.index[indexes_to_drop], inplace=True)
+
+    # Filter out deepfake methods if requested for ForgeryNet
+    if len(opt.deepfake_methods) > 0:
+        for df in [df_train df_validation]:
+            indexes_to_drop = []
+            for index, row in df.iterrows():
+                if row['8_cls'] not in opt.deepfake_methods:
+                    indexes_to_drop.append(index)
+            df.drop(df.index[indexes_to_drop], inplace=True)
+            
+    # Split videos and labels and reduce to the required number of videos
     train_videos = df_train['video'].tolist()
     train_labels = df_train['label'].tolist()
-    
+
     validation_videos = df_validation['video'].tolist()
     validation_labels = df_validation['label'].tolist()
 

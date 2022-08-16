@@ -181,8 +181,7 @@ if __name__ == "__main__":
                 frames_per_identity = [int(row[1] / config["model"]["num-patches"]) for row in tokens_per_identity]
                 
                 aggregated_attentions, identity_attentions = aggregate_attentions(attentions, config['model']['heads'], config['model']['num-frames'], frames_per_identity)
-                if len(identity_attentions) > 1:
-                    print(torch.sigmoid(test_pred[0]), labels[0], identity_attentions, identity_names)
+                
                 if opt.save_attentions:
                     save_attention_plots(aggregated_attentions, identity_names, frames_per_identity, config['model']['num-frames'], video_ids[0])
 

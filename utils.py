@@ -50,7 +50,7 @@ def multiple_lists_mean(a):
     return sum(a) / len(a)
 
 # Aggregate space and time attention 
-def aggregate_attentions(attentions, heads, num_frames, frames_per_identity, scale_factor = 100000):
+def aggregate_attentions(attentions, heads, num_frames, frames_per_identity, scale_factor = 50000):
 
     # Collapse attentions heads for each attention separated
     aggregated_attentions = []
@@ -117,3 +117,8 @@ def draw_border(img, pt1, pt2, color, thickness, r, d):
     cv2.line(img, (x2, y2 - r), (x2, y2 - r - d), color, thickness)
     cv2.ellipse(img, (x2 - r, y2 - r), (r, r), 0, 0, 90, color, thickness)
     return img
+
+
+
+def count_parameters(model):
+    return sum(p.numel() for p in model.parameters() if p.requires_grad)

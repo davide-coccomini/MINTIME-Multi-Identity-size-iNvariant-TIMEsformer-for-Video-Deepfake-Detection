@@ -5,7 +5,7 @@ import argparse
 from tqdm import tqdm
 import math
 import yaml
-from utils import check_correct, aggregate_attentions, save_attention_plots
+from utils import check_correct, aggregate_attentions, save_attention_plots, count_parameters
 from torch.optim.lr_scheduler import LambdaLR
 from datetime import datetime, timedelta
 from statistics import mean
@@ -44,6 +44,8 @@ if __name__ == "__main__":
                         help='Path to the dataset converted into identities.')
     parser.add_argument('--video_path', default="../datasets/ForgeryNet/videos", type=str,
                         help='Path to the dataset original videos (.mp4 files).')
+    parser.add_argument('--deepfake_methods', nargs='*', required=False,
+                        help="For ForgeryNet dataset, filter some deepfake methods for partial training.")
     parser.add_argument('--workers', default=8, type=int,
                         help='Number of data loader workers.')
     parser.add_argument('--random_state', default=42, type=int,
@@ -99,14 +101,16 @@ if __name__ == "__main__":
 
     
     if os.path.exists(opt.model_weights):
-        model.load_state_dict(torch.load(opt.model_weights))
+        model.load_state_dict(torch.load(opt.model_weights, map_location=torch.device('cpu')))
     else:
         raise Exception("No checkpoint loaded for the model.")    
 
     loss_fn = torch.nn.BCEWithLogitsLoss()
 
     # Move into GPU
-    features_extractor = features_extractor.to(opt.gpu_id)    
+    features_extractor = features_extractor.to(opt.gpu_id)   
+    print("Extractor Parameters: ", count_parameters(features_extractor))  
+    print("Model Parameters: ", count_parameters(model)) 
     model = model.to(opt.gpu_id)
     features_extractor.eval()
     model.eval()
@@ -117,6 +121,18 @@ if __name__ == "__main__":
     df_test = pd.read_csv(opt.test_list_file, sep=' ', names=col_names)
     df_test = df_test.sample(frac=1, random_state=opt.random_state).reset_index(drop=True)
 
+    
+    # Filter out deepfake methods if requested for ForgeryNet
+    if opt.deepfake_methods is not None and len(opt.deepfake_methods) > 0:
+        opt.deepfake_methods = [int(method) for method in opt.deepfake_methods]
+        indexes_to_drop = []
+        for index, row in df_test.iterrows():
+            if row['8_cls'] not in opt.deepfake_methods:
+                indexes_to_drop.append(index)
+        df_test.drop(df_test.index[indexes_to_drop], inplace=True)
+            
+            
+    # Split videos and labels and reduce to the required number of videos
     test_videos = df_test['video'].tolist()
     test_labels = df_test['label'].tolist()
     multiclass_labels = df_test['8_cls'].tolist()

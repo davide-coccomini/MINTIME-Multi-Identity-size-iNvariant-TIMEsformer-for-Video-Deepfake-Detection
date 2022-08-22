@@ -386,7 +386,7 @@ def predict(video_path, clustered_faces, config, opt, discarded_faces = None):
 
     with torch.no_grad():
         video = rearrange(videos, "b f h w c -> (b f) c h w")
-        features = features_extractor.extract_features(video)  
+        features = features_extractor(video)  
 
         features = rearrange(features, '(b f) c h w -> b f c h w', b = b, f = f)   
         test_pred, attentions = model(features, mask=mask, size_embedding=size_embeddings, identities_mask=identities_mask, positions=positions)

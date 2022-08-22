@@ -169,7 +169,7 @@ if __name__ == "__main__":
 
 
     # Remove the videos without face detection from the list
-    for df in [df_train df_validation]:
+    for df in [df_train, df_validation]:
         indexes_to_drop = []
         for index, row in df.iterrows():
             video_path = os.path.join(opt.data_path, row["video"])
@@ -179,7 +179,8 @@ if __name__ == "__main__":
 
     # Filter out deepfake methods if requested for ForgeryNet
     if len(opt.deepfake_methods) > 0:
-        for df in [df_train df_validation]:
+        opt.deepfake_methods = [int(method) for method in opt.deepfake_methods]
+        for df in [df_train, df_validation]:
             indexes_to_drop = []
             for index, row in df.iterrows():
                 if row['8_cls'] not in opt.deepfake_methods:
@@ -341,9 +342,9 @@ if __name__ == "__main__":
                 print("\nLoss: ", total_loss/counter, "Accuracy: ", train_correct/(counter*config['training']['bs']) ,"Train 0s: ", negative, "Train 1s:", positive, "Expected Time:", expected_time)
 
             bar.next()
-        
+
         # Clean variables before moving into validation
-        torch.cuda.empty_cache() 
+        #torch.cuda.empty_cache() 
         val_correct = 0
         val_positive = 0
         val_negative = 0
@@ -389,7 +390,6 @@ if __name__ == "__main__":
             scheduler.step()
 
 
-        torch.cuda.empty_cache() 
         bar.finish()
             
         total_val_loss /= val_counter

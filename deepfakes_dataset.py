@@ -300,14 +300,15 @@ class DeepFakesDataset(Dataset):
         # Generate coherent temporal-positional embedding
         images_frames_positions = {k: v+1 for v, k in enumerate(sorted(set(images_frames)))}
         frame_positions = [images_frames_positions[frame] for frame in images_frames]   
-        if self.num_patches != None: 
+        if self.num_patches is not None: 
             positions = [[i+1 for i in range(((frame_position-1)*self.num_patches), self.num_patches*(frame_position))] for frame_position in frame_positions]
             positions = sum(positions, []) # Merge the lists
             positions.insert(0,0) # Add CLS
+            tokens_per_identity = [(os.path.basename(identities[i][0]), identities[i][2]*self.num_patches + identities[i-1][2]*self.num_patches) if i > 0 else (os.path.basename(identities[i][0]), identities[i][2]*self.num_patches) for i in range(len(identities))]     
         else:
             positions = []
+            tokens_per_identity = []
 
-        tokens_per_identity = [(os.path.basename(identities[i][0]), identities[i][2]*self.num_patches + identities[i-1][2]*self.num_patches) if i > 0 else (os.path.basename(identities[i][0]), identities[i][2]*self.num_patches) for i in range(len(identities))]     
         if self.multiclass_labels == None:
             return torch.tensor(sequence).float(), torch.tensor(size_embeddings).int(), torch.tensor(mask).bool(), torch.tensor(identities_mask).bool(), torch.tensor(positions), self.y[index]
         else:       

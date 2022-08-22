@@ -5,14 +5,13 @@
 The continuing advancement of deepfake generation techniques and the increasingly credible results obtained through these, makes it increasingly urgent to develop new techniques to distinguish a manipulated video from a real one. This is, however, a far from simple task that introduces multiple challenges to be overcome, challenges that form the basis of this research work. 
 - <b>Generalization of the Deepfake concept</b>:  Deepfake generation methods tend to introduce specific anomalies within images and videos. Deepfake detection models often tend to learn to recognise these specific anomalies and are therefore ineffective in the real world when dealing with unseen manipulations. Our previous studies in this area suggest a greater capacity for generalisation by Vision Transformers than by Convolutional Neural Networks [<a href="https://arxiv.org/abs/2206.13829">Coccomini et al, 2022</a>];
 - <b>Ability to pick up both spatial and temporal anomalies within a video</b>: Very often the anomalies that are searched for by deepfake detectors are exclusively spatial with frame-by-frame classifications. However, some important anomalies lie precisely in the variation of the face over time, which can be unnatural and thus allow a manipulated video to be identified;
-- <b>Scalability of models</b>: In order to carry out an effective Deepfake Detection, one often tends to exploit large deep learning models or even ensemble techniques involving significant inference and training times; 
 - <b>Handling of multiple faces within the same video</b>: A specific situation that can be exploited by an attacker to deceive a deepfake detection system is found in the case of videos or images with multiple faces (identities). An attacker could in fact decide to manipulate only one of the people in the video. However, if the detection is carried out en bloc for all the faces in the video, the negative contribution to the final prediction made by the fake faces could be 'masked' by the non-manipulated ones, thus deceiving the system.
 - <b>Management of different face-frame area ratios</b>: Typically in deepfake detection systems, the person's face is extracted from the video or image to be classified and before being given as input to a neural model it is rescaled to be uniform with all the others. This results in an important loss of information, namely the ratio of the area of the subject's face to the rest of the scene.
 
 To solve all these problems, we propose a Size-Invariant Multi-Identity Transformer-based architecture that exploits Divided Space-Time attention. 
 The special features of our proposal are as follows:
 - Application of preprocessing and data augmentation techniques to increase the coherence of the video tracks given as input to the network and its generalisation capability;
-- Exploitation of an EfficientNet B0 as a pre-trained patch extractor on Deepfake Detection tasks. This module provides a lightweight, trainable and efficient method of patch extraction compared to the traditional input image split used in Vision Transformers;
+- Exploitation of an EfficientNet B0 as a pre-trained patch extractor on Deepfake Detection tasks. This module provides a trainable and efficient method of patch extraction compared to the traditional input image split used in Vision Transformers;
 - Using a TimeSformer as a Transformer module in order to also capture time variations within a video;
 - Introduction of a new embedding technique, namely size-embedding, to induce face-frame area ratio information to the TimeSformer;
 - Use of novels positional embedding, attention calculation and input sequence generation to enable a TimeSformer to handle multiple identities in the same video.
@@ -51,17 +50,17 @@ For purposes of explainability the attention maps on the various slots of the in
 
 ## Model ZOO
 
-| Model | Identities | Training Dataset | Test Dataset | Accuracy | AUC | Parameters |  Weights |
-| --------------- | --------------- | --------------- |  --------------- | --------------- | --------------- | --------------- | --------------- |
-| SlowFast R-50 | 1 | ForgeryNet | ForgeryNet | 88.78 | 93.88 | 33.6M | // |
-| TSM | 1 | ForgeryNet | ForgeryNet | 88.04 | 93.05 | 33.6M | // |
-| MINTIME | 1 | ForgeryNet | ForgeryNet | 78.10 | 85.95 | ??? | LINK |
-| MINTIME | 2 | ForgeryNet | ForgeryNet | 78.64 | 86.44 | ??? | LINK |
-| MINTIME | 3 | ForgeryNet | ForgeryNet | 78.46 | 86.30 | ??? | LINK |
-| EfficientNet-B0 + MLP | 2 | ForgeryNet | ForgeryNet | ??? | ??? | ??? | LINK |
-| MINTIME | 1 | DFDC | DFDC | ??? | ??? | ??? | LINK |
-| MINTIME | 2 | DFDC | DFDC | ??? | ??? | ??? | LINK |
-| EfficientNet-B0 + MLP | 2 | DFDC | DFDC | ??? | ??? | ??? | LINK |
+| Model | Identities | Training Dataset | Test Dataset | Accuracy | AUC  |  Weights |
+| --------------- | --------------- | --------------- |  --------------- | --------------- | --------------- | --------------- |
+| SlowFast R-50 | 1 | ForgeryNet | ForgeryNet | 88.78 | 93.88 | // |
+| TSM | 1 | ForgeryNet | ForgeryNet | 88.04 | 93.05 | // |
+| MINTIME | 1 | ForgeryNet | ForgeryNet | 81.92 | 90.13 | LINK |
+| MINTIME | 2 | ForgeryNet | ForgeryNet | 82.28 | 90.45 | LINK |
+| MINTIME | 3 | ForgeryNet | ForgeryNet | 82.05 | 90.28 | LINK |
+| EfficientNet-B0 + MLP | 2 | ForgeryNet | ForgeryNet | ??? | ??? | LINK |
+| MINTIME | 1 | DFDC | DFDC | ??? | ??? | LINK |
+| MINTIME | 2 | DFDC | DFDC | ??? | ??? | LINK |
+| EfficientNet-B0 + MLP | 2 | DFDC | DFDC | ??? | ??? | LINK |
 
 
 ## Dataset

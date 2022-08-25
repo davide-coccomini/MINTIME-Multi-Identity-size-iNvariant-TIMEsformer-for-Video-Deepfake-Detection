@@ -50,17 +50,29 @@ For purposes of explainability the attention maps on the various slots of the in
 
 ## Model ZOO
 
+### Models comparison
 | Model | Identities | Training Dataset | Test Dataset | Accuracy | AUC  |  Weights |
 | --------------- | --------------- | --------------- |  --------------- | --------------- | --------------- | --------------- |
-| SlowFast R-50 | 1 | ForgeryNet | ForgeryNet | 88.78 | 93.88 | // |
-| TSM | 1 | ForgeryNet | ForgeryNet | 88.04 | 93.05 | // |
+| SlowFast R-50 | 1 | ForgeryNet | ForgeryNet | 88.78 | 93.88 | N/A |
+| TSM | 1 | ForgeryNet | ForgeryNet | 88.04 | 93.05 | N/A |
 | MINTIME | 1 | ForgeryNet | ForgeryNet | 81.92 | 90.13 | LINK |
 | MINTIME | 2 | ForgeryNet | ForgeryNet | 82.28 | 90.45 | LINK |
 | MINTIME | 3 | ForgeryNet | ForgeryNet | 82.05 | 90.28 | LINK |
-| EfficientNet-B0 + MLP | 2 | ForgeryNet | ForgeryNet | ??? | ??? | LINK |
-| MINTIME | 1 | DFDC | DFDC | ??? | ??? | LINK |
-| MINTIME | 2 | DFDC | DFDC | ??? | ??? | LINK |
-| EfficientNet-B0 + MLP | 2 | DFDC | DFDC | ??? | ??? | LINK |
+| EfficientNet-B0 + MLP | 1 | ForgeryNet | ForgeryNet | 65.33 | 71.42 | LINK |
+| EfficientNet-B0 + MLP | 2 | ForgeryNet | ForgeryNet | 67.03 | 71.05 | LINK |
+| EfficientNet-B0 + MLP | 3 | ForgeryNet | ForgeryNet | 66.89 | 70.92 | LINK |
+
+
+### Cross-Forgery Analysis
+|                 |                 | ID-replaced     | ID-remained     | Identities      |
+| --------------- | --------------- | --------------- | --------------- | --------------- | 
+|                 |                 | Accuracy & AUC  | Accuracy & AUC  |                 |
+| X3D-M           | ID-replaced     |  87.92   & 92.91| 55.25    & 65.59|       1         |
+|                 | ID-remained     |  55.93   & 62.87| 88.85    & 95.40|                 |
+| SlowFast        | ID-replaced     |  88.26   & 92.88| 52.64    & 64.83|       1         |
+|                 | ID-remained     |  52.70   & 61.50| 87.96    & 95.47|                 |
+| MINTIME         | ID-replaced     |  80.18   & 83.86| 79.03    & 86.98|       2         |
+|                 | ID-remained     |  63.13   & 66.26| 89.22    & 95.02|                 |
 
 
 ## Dataset

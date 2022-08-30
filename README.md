@@ -45,8 +45,14 @@ python3 predict.py --video_path path/to/video.mp4 --model_weights path/to/model_
 The output video will be stored in the examples/preds folder:
 ![Prediction Example](images/example_detection.gif)
 
-For purposes of explainability the attention maps on the various slots of the input sequence are also saved. These are used to work out, in the multi-identity case, which identity is fake in each frame.
+For purposes of explainability the attention maps on the various slots of the input sequence are also saved. These are used to discover, in the multi-identity case, which identity is fake in each frame.
 
+In the following example, the 16 slots are distributed between the two identities according to the number of available faces, the first 6 for identity 0 (the man), the second 6 for identity 1 (the woman). The remaining 4 slots are ignored as there are no additional faces to fill them. 
+The attention values extracted from the various heads are combined considering the maximum values for each tokens. The tokens are then grouped according to the frame and identity they refer to, resulting in 16 attention values (of which 4 are null). The spatial and temporal attention is combined to obtain the final value via the average function. Finally, the softmax function is applied to emphasise the differences between the attention placed on one face rather than another.
+
+In this case, the attention in slot 20 of the second identity is particularly high, which indicates that there is an anomaly there.
+
+![Prediction Example](images/attention_analysis.gif)
 
 ## Model ZOO
 

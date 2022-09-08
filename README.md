@@ -81,6 +81,14 @@ In this case, the attention in frame 20 of the second identity is particularly h
 |                 | ID-remained     |  63.13   & 66.26| 89.22    & 95.02|                 |
 
 
+
+### Size Embedding evaluation
+| Model | Identities | Training Dataset | Test Dataset | Accuracy | AUC  |
+| --------------- | --------------- | --------------- | --------------- | --------------- | 
+| MINTIME with size-embedding | 2 | ForgeryNet | ForgeryNet | 82.05 | 90.28 |
+| MINTIME w/o size-embedding | 2 | ForgeryNet | ForgeryNet | 81.83 | 90.13 |
+
+
 ## Dataset
 In order to conduct our research, it was necessary to analyse the various datasets in circulation in order to identify the one with the following characteristics:
 - Containing a sufficient number of videos for effective training;

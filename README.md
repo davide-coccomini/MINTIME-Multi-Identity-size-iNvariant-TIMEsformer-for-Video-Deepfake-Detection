@@ -67,7 +67,6 @@ In this case, the attention in frame 20 of the second identity is particularly h
 | EfficientNet-B0 + MLP | 1 | ForgeryNet | ForgeryNet | 65.33 | 71.42 | LINK |
 | EfficientNet-B0 + MLP | 2 | ForgeryNet | ForgeryNet | 67.03 | 71.05 | LINK |
 | EfficientNet-B0 + MLP | 3 | ForgeryNet | ForgeryNet | 66.89 | 70.92 | LINK |
-| MINTIME | 3 | ForgeryNet | ForgeryNet | - | 90.28 | LINK |
 
 
 ### Cross-Forgery Analysis

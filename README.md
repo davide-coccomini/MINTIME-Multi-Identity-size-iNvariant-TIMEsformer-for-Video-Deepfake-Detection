@@ -57,10 +57,10 @@ In this case, the attention in frame 20 of the second identity is particularly h
 ## Model ZOO
 
 ### Models comparison
-| Model | Identities | Training Dataset | Test Dataset | Accuracy | AUC  |  Weights |
+| Model | Identities | Training Dataset | Test Dataset | Accuracy | AUC  |  Download |
 | --------------- | --------------- | --------------- |  --------------- | --------------- | --------------- | --------------- |
 | SlowFast R-50 | 1 | ForgeryNet | ForgeryNet | 88.78 | 93.88 | N/A |
-| TSM | 1 | ForgeryNet | ForgeryNet | 88.04 | 93.05 | N/A |
+| X3D-M | 1 | ForgeryNet | ForgeryNet | 87.93 | 93.75 | N/A |
 | MINTIME | 1 | ForgeryNet | ForgeryNet | 81.92 | 90.13 | LINK |
 | MINTIME | 2 | ForgeryNet | ForgeryNet | 82.28 | 90.45 | LINK |
 | MINTIME | 3 | ForgeryNet | ForgeryNet | 82.05 | 90.28 | LINK |

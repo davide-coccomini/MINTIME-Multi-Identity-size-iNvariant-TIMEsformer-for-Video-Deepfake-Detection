@@ -70,6 +70,19 @@ In this case, the attention in frame 20 of the second identity is particularly h
 | EfficientNet-B0 + MLP | 3 | ForgeryNet | ForgeryNet | 66.89 | 70.92 | LINK |
 
 
+# Multi-Identity videos only
+| Model | Accuracy | AUC |
+| ----  |   ----   | ---- |
+| MINTIME | 81.21  | 89.56 |
+| EfficientNet-B0 + MLP | 67.69 | 74226 |
+
+
+# Per-class accuracy
+| Model                 |Pristines | Method 1 | Method 2 | Method 3 | Method 4 | Method 5 | Method 6 | Method 7 | Method 8 | FPR |
+| MINTIME               | 85.84   |  70.05   |  69.75   |  74.55   |   82.05  |  78.14   |  79.59   |  91.49   |  77.03   | 14.16 |
+| EfficientNet-B0 + MLP | 51.68   |  67.67   |  84.41   |  67.58   |   65.80  |  78.68   |  69.72   |  92.87   |  79.04   | 48.31 |
+
+
 ### Cross-Forgery Analysis
 |                 |                 |         T        |      E       |         S        |       T          |
 | --------------- | --------------- | --------------- | --------------- | --------------- | --------------- |

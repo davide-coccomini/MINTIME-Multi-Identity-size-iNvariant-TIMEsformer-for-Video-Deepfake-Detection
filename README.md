@@ -8,14 +8,15 @@ The continuing advancement of deepfake generation techniques and the increasingl
 - <b>Handling of multiple faces within the same video</b>: A specific situation that can be exploited by an attacker to deceive a deepfake detection system is found in the case of videos or images with multiple faces (identities). An attacker could in fact decide to manipulate only one of the people in the video. However, if the detection is carried out en bloc for all the faces in the video, the negative contribution to the final prediction made by the fake faces could be 'masked' by the non-manipulated ones, thus deceiving the system.
 - <b>Management of different face-frame area ratios</b>: Typically in deepfake detection systems, the person's face is extracted from the video or image to be classified and before being given as input to a neural model it is rescaled to be uniform with all the others. This results in an important loss of information, namely the ratio of the area of the subject's face to the rest of the scene.
 
-To solve all these problems, we propose a Size-Invariant Multi-Identity Transformer-based architecture that exploits Divided Space-Time attention. 
-The special features of our proposal are as follows:
-- Application of preprocessing and data augmentation techniques to increase the coherence of the video tracks given as input to the network and its generalisation capability;
-- Exploitation of an EfficientNet B0 as a pre-trained patch extractor on Deepfake Detection tasks. This module provides a trainable and efficient method of patch extraction compared to the traditional input image split used in Vision Transformers;
-- Using a TimeSformer as a Transformer module in order to also capture time variations within a video;
-- Introduction of a new embedding technique, namely size-embedding, to induce face-frame area ratio information to the TimeSformer;
-- Use of novels positional embedding, attention calculation and input sequence generation to enable a TimeSformer to handle multiple identities in the same video.
-
+To solve all these problems, we propose a Size-Invariant Multi-Identity Transformer-based architecture which exploits a novel form of Divided Space-Time attention. 
+The new features, strengths and advantages introduced by our approach are as follows:
+- Ability of our model to capture both spatial and temporal anomalies in a deepfake video by jointly exploiting both a convolutional network and a variant of the Transformer namely the TimeSformer;
+- Ability to handle multi-identity cases effectively. In previous approaches, there is a tendency to ignore people who appear with a lower frequency in the video and to only analyze faces extracted from the most frequent identity. However, in the real world, this can result in a flaw that can be exploited by an attacker who might, for instance, deliberately decide to manipulate a face of an identity that appears for a smaller portion of the video than others and thus escape the deepfake detection algorithms. Our approach, through the introduction of several architectural innovations such as 'Adaptive Input Sequence Assignment', 'Temporal Positional Embedding' and 'Identity-based Attention Calculation', is able to handle any number of identities while remaining robust in terms of classification accuracy. The Adaptive Sequence Assignment approach is designed to construct the input sequence to the model coherently even in the presence of multiple identities. Temporal Positional Embedding is a modification to the classical positional embedding of Transformers that keeps tokens not only spatially but also temporally consistent in terms of the identities to which they belong. Finally, Identity-based Attention calculation is a particular way of calculating attention that we have developed so that the network first focuses separately on the different identities that occur in the video and then converges to a single CLS token that is influenced by and common to all of them. This CLS is finally used for the final video-level classification.
+- Ability to handle different face-frame area ratios through the introduction of 'Size Embedding'. Typically in deepfake detection systems, the person's face is extracted from the video or image to be classified and before being given as input to a neural model it is rescaled to be uniform with all the others. This results in an important loss of information, namely the ratio of the area of the subject's face to the rest of the scene. This may be reflected in missclassification with faces with a particular ratio being classified as fakes even though they are not.
+- Explainability of the results by analyzing the attention maps produced by the model. By looking at the attention values assigned by the model to the tokens associated with the individual faces as input, it is possible to obtain a more refined classification that is not only limited to saying whether or not the video is fake but also which of the multiple identities, if any, were manipulated and at what point in the video.
+- Near state-of-the-art results on ForgeryNet dataset.
+- Generalization capability on unseen deepfake generation methods demonstrated by analyzing the results obtained on approaches not considered in the training set obtaining pr surpassing state-of-the-art accuracies on all setups.
+  
 
 ## Setup
 Clone the repository and move into it:
@@ -70,15 +71,16 @@ In this case, the attention in frame 20 of the second identity is particularly h
 
 
 ### Cross-Forgery Analysis
-|                 |                 | ID-replaced     | ID-remained     | Identities      |
-| --------------- | --------------- | --------------- | --------------- | --------------- | 
-|                 |                 | Accuracy & AUC  | Accuracy & AUC  |                 |
-| X3D-M           | ID-replaced     |  87.92   & 92.91| 55.25    & 65.59|       1         |
-|                 | ID-remained     |  55.93   & 62.87| 88.85    & 95.40|                 |
-| SlowFast        | ID-replaced     |  88.26   & 92.88| 52.64    & 64.83|       1         |
-|                 | ID-remained     |  52.70   & 61.50| 87.96    & 95.47|                 |
-| MINTIME         | ID-replaced     |  80.18   & 83.86| 79.03    & 86.98|       2         |
-|                 | ID-remained     |  63.13   & 66.26| 89.22    & 95.02|                 |
+|                 |                 |         T        |      E       |         S        |       T          |
+| --------------- | --------------- | --------------- | --------------- | --------------- | --------------- |
+|                 |                 | ID-replaced     | ID-remained     | Identities      |                 |
+|                 |                 | Accuracy & AUC  | Accuracy & AUC  |                 |                 |
+| X3D-M           |        T        | ID-replaced     |  87.92   & 92.91| 55.25    & 65.59|       1         |
+|                 |        R        | ID-remained     |  55.93   & 62.87| 88.85    & 95.40|                 |
+| SlowFast        |        A        | ID-replaced     |  88.26   & 92.88| 52.64    & 64.83|       1         |
+|                 |        I        | ID-remained     |  52.70   & 61.50| 87.96    & 95.47|                 |
+| MINTIME         |        N        | ID-replaced     |  80.18   & 83.86| 79.03    & 86.98|       2         |
+|                 |                 | ID-remained     |  63.13   & 66.26| 89.22    & 95.02|                 |
 
 
 

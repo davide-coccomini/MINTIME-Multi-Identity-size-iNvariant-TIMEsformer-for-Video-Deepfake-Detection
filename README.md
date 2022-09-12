@@ -88,16 +88,16 @@ Accuracy obtained by the models on the various deepfake generation methods in th
 
 
 ### Cross-Forgery Analysis
-|                 |                 |         T        |      E       |         S        |       T          |
-| --------------- | --------------- | --------------- | --------------- | --------------- | --------------- |
-|                 |                 | ID-replaced     | ID-remained     | Identities      |                 |
-|                 |                 | Accuracy & AUC  | Accuracy & AUC  |                 |                 |
-| X3D-M           |        T        | ID-replaced     |  87.92   & 92.91| 55.25    & 65.59|       1         |
-|                 |        R        | ID-remained     |  55.93   & 62.87| 88.85    & 95.40|                 |
-| SlowFast        |        A        | ID-replaced     |  88.26   & 92.88| 52.64    & 64.83|       1         |
-|                 |        I        | ID-remained     |  52.70   & 61.50| 87.96    & 95.47|                 |
-| MINTIME         |        N        | ID-replaced     |  80.18   & 83.86| 79.03    & 86.98|       2         |
-|                 |                 | ID-remained     |  63.13   & 66.26| 89.22    & 95.02|                 |
+
+|                 |                 | ID-replaced     | ID-remained     | Identities      |                 
+| --------------- | --------------- | --------------- | --------------- | --------------- |
+|                 |                  | Accuracy & AUC  | Accuracy & AUC  |                 |                 
+| X3D-M           |  ID-replaced     |  87.92   & 92.91| 55.25    & 65.59|       1         |
+|                 |  ID-remained     |  55.93   & 62.87| 88.85    & 95.40|                 |
+| SlowFast        |  ID-replaced     |  88.26   & 92.88| 52.64    & 64.83|       1         |
+|                 |  ID-remained     |  52.70   & 61.50| 87.96    & 95.47|                 |
+| MINTIME         |  ID-replaced     |  80.18   & 83.86| 79.03    & 86.98|       2         |
+|                 |  ID-remained     |  63.13   & 66.26| 89.22    & 95.02|                 |
 
 
 

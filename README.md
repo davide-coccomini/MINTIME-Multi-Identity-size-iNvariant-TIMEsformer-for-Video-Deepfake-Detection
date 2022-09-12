@@ -70,7 +70,7 @@ In this case, the attention in frame 20 of the second identity is particularly h
 | EfficientNet-B0 + MLP | 3 | ForgeryNet | ForgeryNet | 66.89 | 70.92 | LINK |
 
 
-# Multi-Identity videos only
+###  Multi-Identity videos only
 Accuracy obtained from models on multi-identity videos only.
 
 | Model | Accuracy | AUC |
@@ -79,7 +79,7 @@ Accuracy obtained from models on multi-identity videos only.
 | EfficientNet-B0 + MLP | 67.69 | 74.26 |
 
 
-# Per-class accuracy
+###  Per-class accuracy
 Accuracy obtained by the models on the various deepfake generation methods in the test set.
 | Model |Pristines | Method 1 | Method 2 | Method 3 | Method 4 | Method 5 | Method 6 | Method 7 | Method 8 | FPR |
 | --------------- | --------------- | --------------- | --------------- | --------------- | --------------- | --------------- | --------------- | --------------- | --------------- | --------------- |

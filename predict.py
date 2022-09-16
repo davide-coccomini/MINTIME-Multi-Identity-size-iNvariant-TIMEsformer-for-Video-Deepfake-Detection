@@ -516,7 +516,11 @@ if __name__ == "__main__":
     crops = extract_crops(opt.video_path, bboxes_dict)
     print("Faces cropping completed.")
 
-
+    '''
+    for j, crop in enumerate(crops):
+        cv2.imwrite("outputs/faces/face_{}.png".format(j), np.asarray(crop[1]))
+    '''
+    
     print("Clustering faces...")
     clustered_faces = cluster_faces(crops)
     print("Faces clustering completed.")

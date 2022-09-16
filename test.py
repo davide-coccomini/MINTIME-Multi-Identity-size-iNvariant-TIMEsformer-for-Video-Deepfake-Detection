@@ -14,6 +14,7 @@ import collections
 import os
 import json
 from sklearn import metrics
+from sklearn.metrics import f1_score
 from itertools import chain
 import random
 from einops import rearrange, reduce
@@ -57,7 +58,9 @@ if __name__ == "__main__":
     parser.add_argument('--gpu_id', default=0, type=int,
                         help='ID of GPU to be used.')
     parser.add_argument('--max_videos', type=int, default=-1, 
-                        help="Maximum number of videos to use for training (default: all).")
+                        help="Maximum number of videos to use for training (default: all).")                  
+    parser.add_argument('--only_multiidentity', default=False, action="store_true",
+                        help='Use only multiidentity videos.')
     parser.add_argument('--config', type=str, 
                         help="Which configuration to use. See into 'config' folder.")
     parser.add_argument('--model', type=int, 
@@ -130,7 +133,16 @@ if __name__ == "__main__":
             if row['8_cls'] not in opt.deepfake_methods:
                 indexes_to_drop.append(index)
         df_test.drop(df_test.index[indexes_to_drop], inplace=True)
-            
+    
+    # Filter out non-multi-identity videos if requested
+    if opt.only_multiidentity:
+        indexes_to_drop = []
+        for index, row in df_test.iterrows():
+            video_path = os.path.join(opt.data_path, row['video']) 
+            if len(os.listdir(video_path)) < 2:
+                indexes_to_drop.append(index)
+                
+        df_test.drop(df_test.index[indexes_to_drop], inplace=True)
             
     # Split videos and labels and reduce to the required number of videos
     test_videos = df_test['video'].tolist()
@@ -193,12 +205,12 @@ if __name__ == "__main__":
                 features = rearrange(features, '(b f) c h w -> b f c h w', b = b, f = f)   
                 test_pred, attentions = model(features, mask=masks, size_embedding=size_embeddings, identities_mask=identities_masks, positions=positions)
                 
-                identity_names = [row[0] for row in tokens_per_identity]
-                frames_per_identity = [int(row[1] / config["model"]["num-patches"]) for row in tokens_per_identity]
-                
-                aggregated_attentions, identity_attentions = aggregate_attentions(attentions, config['model']['heads'], config['model']['num-frames'], frames_per_identity)
-                
                 if opt.save_attentions:
+                    identity_names = [row[0] for row in tokens_per_identity]
+                    frames_per_identity = [int(row[1] / config["model"]["num-patches"]) for row in tokens_per_identity]
+                    
+                    aggregated_attentions, identity_attentions = aggregate_attentions(attentions, config['model']['heads'], config['model']['num-frames'], frames_per_identity)
+                    
                     save_attention_plots(aggregated_attentions, identity_names, frames_per_identity, config['model']['num-frames'], video_ids[0])
 
         videos = videos.cpu()
@@ -217,11 +229,12 @@ if __name__ == "__main__":
     preds = [torch.sigmoid(torch.tensor(pred)) for pred in preds]
     fpr, tpr, th = metrics.roc_curve(test_labels, preds)
     auc = metrics.auc(fpr, tpr)
+    f1 = f1_score(test_labels, [round(pred.item()) for pred in preds])
     bar.finish()
     total_test_loss /= test_counter
     test_correct /= test_samples
     print("Videos errors", videos_errors)
     print("Class errors", multiclass_errors)
     print(str(opt.model_weights) + " test loss:" +
-            str(total_test_loss) + " test accuracy:" + str(test_correct) + " test_0s:" + str(test_negative) + "/" + str(test_counters[0]) + " test_1s:" + str(test_positive) + "/" + str(test_counters[1]) + " AUC " + str(auc))
+            str(total_test_loss) + " f1 score: " + str(f1) + " test accuracy:" + str(test_correct) + " test_0s:" + str(test_negative) + "/" + str(test_counters[0]) + " test_1s:" + str(test_positive) + "/" + str(test_counters[1]) + " AUC " + str(auc))
     

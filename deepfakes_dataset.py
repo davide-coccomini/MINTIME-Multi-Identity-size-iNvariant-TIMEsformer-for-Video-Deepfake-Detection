@@ -128,7 +128,7 @@ class DeepFakesDataset(Dataset):
             
             # Sort faces based on temporal order
             sorted_identities.append(self.get_identity_information(identity))
-
+        
         # If no faces have been found, use the discarded faces
         if len(sorted_identities) == 0:
             sorted_identities.append(self.get_identity_information(os.path.dirname(discarded_faces[0])))
@@ -136,9 +136,10 @@ class DeepFakesDataset(Dataset):
 
         # Sort identities based on faces size
         sorted_identities = sorted(sorted_identities, key=lambda x:x[1], reverse=True)
+        
         if len(sorted_identities) > self.max_identities:
             sorted_identities = sorted_identities[:self.max_identities]
-
+            
         # Adjust the identities list faces number
         identities_number = len(sorted_identities)
         available_additional_faces = []

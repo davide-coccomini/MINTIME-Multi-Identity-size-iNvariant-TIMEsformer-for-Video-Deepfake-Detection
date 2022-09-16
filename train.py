@@ -178,7 +178,7 @@ if __name__ == "__main__":
         df.drop(df.index[indexes_to_drop], inplace=True)
 
     # Filter out deepfake methods if requested for ForgeryNet
-    if len(opt.deepfake_methods) > 0:
+    if opt.deepfake_methods is not None and len(opt.deepfake_methods) > 0:
         opt.deepfake_methods = [int(method) for method in opt.deepfake_methods]
         for df in [df_train, df_validation]:
             indexes_to_drop = []

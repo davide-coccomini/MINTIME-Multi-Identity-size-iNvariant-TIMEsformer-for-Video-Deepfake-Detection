@@ -31,18 +31,20 @@ from torch.utils.tensorboard import SummaryWriter
 import torch_optimizer as optim
 from timm.scheduler.cosine_lr import CosineLRScheduler
 from models.baseline import Baseline
+from models.xception import xception
 
 
 if __name__ == "__main__":
+    os.environ["CUDA_VISIBLE_DEVICES"] = "3,4,5"
     parser = argparse.ArgumentParser()
     
-    parser.add_argument('--train_list_file', default="../datasets/ForgeryNet/faces/train.csv", type=str,
+    parser.add_argument('--train_list_file', default="../../datasets/ForgeryNet/faces/train_and_val.csv", type=str,
                         help='Training List txt file path)')
-    parser.add_argument('--validation_list_file', default="../datasets/ForgeryNet/faces/val.csv", type=str,
+    parser.add_argument('--validation_list_file', default="../../datasets/ForgeryNet/faces/test.csv", type=str,
                         help='Validation List txt file path)')  
-    parser.add_argument('--data_path', default="../datasets/ForgeryNet/faces", type=str,
+    parser.add_argument('--data_path', default="../../datasets/ForgeryNet/faces", type=str,
                         help='Path to the dataset converted into identities.')
-    parser.add_argument('--video_path', default="../datasets/ForgeryNet/videos", type=str,
+    parser.add_argument('--video_path', default="../../datasets/ForgeryNet/videos", type=str,
                         help='Path to the dataset original videos (.mp4 files).')
     parser.add_argument('--deepfake_methods', nargs='*', required=False,
                         help="For ForgeryNet dataset, filter some deepfake methods for partial training.")
@@ -56,6 +58,8 @@ if __name__ == "__main__":
                         help='Maintain the backbone freezed or train it.')
     parser.add_argument('--restore_epoch', default=False, action="store_true",
                         help='When resume checkpoint specified, resume from the exact epoch.')
+    parser.add_argument('--extractor_model', type=int, default=0, 
+                        help="Which model use for features extraction (0: EfficientNet; 1: XceptionNet).")
     parser.add_argument('--extractor_unfreeze_blocks', type=int, default=-1, 
                         help="How many layers unfreeze in the extractor.")
     parser.add_argument('--extractor_weights', default='ImageNet', type=str,
@@ -103,13 +107,19 @@ if __name__ == "__main__":
     os.makedirs(opt.models_output_path, exist_ok=True)
 
     # Load required weights for feature extractor
-    if opt.extractor_weights.lower() == 'imagenet':
-        features_extractor = EfficientNet.from_pretrained('efficientnet-b0')
-    else:
-        features_extractor = EfficientNet.from_name('efficientnet-b0')
-        features_extractor.load_matching_state_dict(torch.load(opt.extractor_weights, map_location=torch.device('cpu')))
-        print("Custom features extractor weights loaded.")
-    
+    if opt.extractor_model == 0: # EfficientNet-B0
+        if opt.extractor_weights.lower() == 'imagenet':
+            features_extractor = EfficientNet.from_pretrained('efficientnet-b0')
+        else:
+            features_extractor = EfficientNet.from_name('efficientnet-b0')
+            features_extractor.load_matching_state_dict(torch.load(opt.extractor_weights, map_location=torch.device('cpu')))
+            print("Custom features extractor weights loaded.")
+    else: # XceptionNet
+        if opt.extractor_weights.lower() == 'pretrained':
+            features_extractor = xception(num_classes=1, pretrain_path="weights/ckpt_iter.pth.tar")
+        else:
+            features_extractor = xception(num_classes=1, pretrain_path=opt.extractor_weights)
+
     # Init the required model
     if opt.model == 0:
         model = Baseline(config=config)
@@ -133,7 +143,9 @@ if __name__ == "__main__":
                         param.requires_grad = False
                 else:                    
                     param.requires_grad = False
-
+        else:
+            for name, param in features_extractor.named_parameters():
+                param.requires_grad = True
 
     # Move models to GPU 
     features_extractor = features_extractor.to(device)    
@@ -254,6 +266,10 @@ if __name__ == "__main__":
     else:
         print("Warning: Invalid scheduler specified in the config file.")
 
+    
+    if opt.gpu_id == -1:
+        features_extractor = torch.nn.DataParallel(features_extractor)
+        model = torch.nn.DataParallel(model)
 
     starting_epoch = 0
     if os.path.exists(opt.resume):
@@ -264,10 +280,6 @@ if __name__ == "__main__":
         print("No checkpoint loaded for the model.")
 
 
-    
-    if opt.gpu_id == -1:
-        features_extractor = torch.nn.DataParallel(features_extractor)
-        model = torch.nn.DataParallel(model)
 
 
     # Init variables for training
@@ -314,7 +326,7 @@ if __name__ == "__main__":
             elif opt.model == 1: # Size-Invariant TimeSformer
                 features = rearrange(features, '(b f) c h w -> b f c h w', b = b, f = f)
                 y_pred = model(features, mask=masks, size_embedding=size_embeddings, identities_mask=identities_masks, positions=positions)
-        
+            
             # Calculate loss
             videos = videos.cpu()
             y_pred = y_pred.cpu()
@@ -404,7 +416,7 @@ if __name__ == "__main__":
 
         # Save checkpoint if the model's validation loss is improving
         if previous_loss > total_val_loss:
-            torch.save(features_extractor.state_dict(), os.path.join(opt.models_output_path,  "EfficientNetExtractor_checkpoint" + str(t)))
+            torch.save(features_extractor.state_dict(), os.path.join(opt.models_output_path,  "Extractor_checkpoint" + str(t)))
             torch.save(model.state_dict(), os.path.join(opt.models_output_path,  "Model_checkpoint" + str(t)))
 
         previous_loss = total_val_loss

@@ -86,6 +86,7 @@ Accuracy obtained from models on multi-identity videos only.
 Accuracy obtained by the models on the various deepfake generation methods in the test set.
 | Model |Pristines | Method 1 | Method 2 | Method 3 | Method 4 | Method 5 | Method 6 | Method 7 | Method 8 | FPR |
 | --------------- | --------------- | --------------- | --------------- | --------------- | --------------- | --------------- | --------------- | --------------- | --------------- | --------------- |
+| MINTIME-XC              | 88.15   |  79.94   |  84.64   | 82.17    |   84.05  |  77.59   |  85.37   |  92.03   | 79.91 |  14.06 |
 | MINTIME-EF              | 85.84   |  70.05   |  69.75   |  74.55   |   82.05  |  78.14   |  79.59   |  91.49   |  77.03   | 14.16 |
 | EfficientNet-B0 + MLP | 51.68   |  67.67   |  84.41   |  67.58   |   65.80  |  78.68   |  69.72   |  92.87   |  79.04   | 48.31 |
 

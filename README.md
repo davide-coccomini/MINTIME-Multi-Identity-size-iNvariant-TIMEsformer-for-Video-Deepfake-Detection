@@ -60,9 +60,9 @@ In this case, the attention in frame 20 of the second identity is particularly h
 ### Models comparison
 | Model | Identities | Training Dataset | Test Dataset | Accuracy | AUC  |  Download |
 | --------------- | --------------- | --------------- |  --------------- | --------------- | --------------- | --------------- |
-| MINTIME-XE | 1 | ForgeryNet | ForgeryNet | 84.98 | 93.28 | LINK |
-| MINTIME-XE | 2 | ForgeryNet | ForgeryNet | 86.40 | 94.08 | LINK |
-| MINTIME-XE | 3 | ForgeryNet | ForgeryNet | 86.05 | 93.93 | LINK |
+| MINTIME-XC | 1 | ForgeryNet | ForgeryNet | 84.98 | 93.28 | LINK |
+| MINTIME-XC | 2 | ForgeryNet | ForgeryNet | 86.40 | 94.08 | LINK |
+| MINTIME-XC | 3 | ForgeryNet | ForgeryNet | 86.05 | 93.93 | LINK |
 | SlowFast R-50 | 1 | ForgeryNet | ForgeryNet | 88.78 | 93.88 | N/A |
 | X3D-M | 1 | ForgeryNet | ForgeryNet | 87.93 | 93.75 | N/A |
 | MINTIME-EF | 1 | ForgeryNet | ForgeryNet | 81.92 | 90.13 | LINK |

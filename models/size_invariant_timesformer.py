@@ -227,9 +227,12 @@ class SizeInvariantTimeSformer(nn.Module):
         cls_token = repeat(self.cls_token, 'n d -> b n d', b = b)
         x =  torch.cat((cls_token, tokens), dim = 1)
 
-        # Positional embedding
-        x += self.pos_emb(positions)
-
+        # Positional 
+        if self.enable_pos_embedding:
+            x += self.pos_emb(positions)
+        else:
+            x += self.pos_emb(torch.arange(x.shape[1]))
+            
         # Size embedding
         if self.enable_size_emb:
             size_embedding = repeat(size_embedding, 'b f -> b f p', p=self.num_patches)      # B x 8 x 49   

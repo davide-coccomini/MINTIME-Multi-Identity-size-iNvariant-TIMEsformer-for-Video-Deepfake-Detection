@@ -60,11 +60,14 @@ In this case, the attention in frame 20 of the second identity is particularly h
 ### Models comparison
 | Model | Identities | Training Dataset | Test Dataset | Accuracy | AUC  |  Download |
 | --------------- | --------------- | --------------- |  --------------- | --------------- | --------------- | --------------- |
+| MINTIME-XE | 1 | ForgeryNet | ForgeryNet | 84.98 | 93.28 | LINK |
+| MINTIME-XE | 2 | ForgeryNet | ForgeryNet | 86.40 | 94.08 | LINK |
+| MINTIME-XE | 3 | ForgeryNet | ForgeryNet | 86.05 | 93.93 | LINK |
 | SlowFast R-50 | 1 | ForgeryNet | ForgeryNet | 88.78 | 93.88 | N/A |
 | X3D-M | 1 | ForgeryNet | ForgeryNet | 87.93 | 93.75 | N/A |
-| MINTIME | 1 | ForgeryNet | ForgeryNet | 81.92 | 90.13 | LINK |
-| MINTIME | 2 | ForgeryNet | ForgeryNet | 82.28 | 90.45 | LINK |
-| MINTIME | 3 | ForgeryNet | ForgeryNet | 82.05 | 90.28 | LINK |
+| MINTIME-EF | 1 | ForgeryNet | ForgeryNet | 81.92 | 90.13 | LINK |
+| MINTIME-EF | 2 | ForgeryNet | ForgeryNet | 82.28 | 90.45 | LINK |
+| MINTIME-EF | 3 | ForgeryNet | ForgeryNet | 82.05 | 90.28 | LINK |
 | EfficientNet-B0 + MLP | 1 | ForgeryNet | ForgeryNet | 65.33 | 71.42 | LINK |
 | EfficientNet-B0 + MLP | 2 | ForgeryNet | ForgeryNet | 67.03 | 71.05 | LINK |
 | EfficientNet-B0 + MLP | 3 | ForgeryNet | ForgeryNet | 66.89 | 70.92 | LINK |
@@ -75,7 +78,7 @@ Accuracy obtained from models on multi-identity videos only.
 
 | Model | Accuracy | AUC |
 | ----  |   ----   | ---- |
-| MINTIME | 81.21  | 89.56 |
+| MINTIME-EF | 81.21  | 89.56 |
 | EfficientNet-B0 + MLP | 67.69 | 74.26 |
 
 
@@ -83,7 +86,7 @@ Accuracy obtained from models on multi-identity videos only.
 Accuracy obtained by the models on the various deepfake generation methods in the test set.
 | Model |Pristines | Method 1 | Method 2 | Method 3 | Method 4 | Method 5 | Method 6 | Method 7 | Method 8 | FPR |
 | --------------- | --------------- | --------------- | --------------- | --------------- | --------------- | --------------- | --------------- | --------------- | --------------- | --------------- |
-| MINTIME               | 85.84   |  70.05   |  69.75   |  74.55   |   82.05  |  78.14   |  79.59   |  91.49   |  77.03   | 14.16 |
+| MINTIME-EF              | 85.84   |  70.05   |  69.75   |  74.55   |   82.05  |  78.14   |  79.59   |  91.49   |  77.03   | 14.16 |
 | EfficientNet-B0 + MLP | 51.68   |  67.67   |  84.41   |  67.58   |   65.80  |  78.68   |  69.72   |  92.87   |  79.04   | 48.31 |
 
 
@@ -96,7 +99,7 @@ Accuracy obtained by the models on the various deepfake generation methods in th
 |                 |  ID-remained     |  55.93   & 62.87| 88.85    & 95.40|                 |
 | SlowFast        |  ID-replaced     |  88.26   & 92.88| 52.64    & 64.83|       1         |
 |                 |  ID-remained     |  52.70   & 61.50| 87.96    & 95.47|                 |
-| MINTIME         |  ID-replaced     |  80.18   & 83.86| 79.03    & 86.98|       2         |
+| MINTIME-EF      |  ID-replaced     |  80.18   & 83.86| 79.03    & 86.98|       2         |
 |                 |  ID-remained     |  63.13   & 66.26| 89.22    & 95.02|                 |
 
 
@@ -104,8 +107,8 @@ Accuracy obtained by the models on the various deepfake generation methods in th
 ### Size Embedding evaluation
 | Model | Identities | Training Dataset | Test Dataset | Accuracy | AUC  |
 | --------------- | --------------- | --------------- | --------------- | --------------- | --------------- | 
-| MINTIME with size-embedding | 2 | ForgeryNet | ForgeryNet | 82.05 | 90.28 |
-| MINTIME w/o size-embedding | 2 | ForgeryNet | ForgeryNet | 81.83 | 90.13 |
+| MINTIME-EF with size-embedding | 2 | ForgeryNet | ForgeryNet | 82.05 | 90.28 |
+| MINTIME-EF w/o size-embedding | 2 | ForgeryNet | ForgeryNet | 81.83 | 90.13 |
 
 
 ## Dataset

@@ -78,6 +78,7 @@ Accuracy obtained from models on multi-identity videos only.
 
 | Model | Accuracy | AUC |
 | ----  |   ----   | ---- |
+| MINTIME-XC | 86.58  | 93.32 |
 | MINTIME-EF | 81.21  | 89.56 |
 | EfficientNet-B0 + MLP | 67.69 | 74.26 |
 
@@ -100,7 +101,7 @@ Accuracy obtained by the models on the various deepfake generation methods in th
 |                 |  ID-remained     |  55.93   & 62.87| 88.85    & 95.40|                 |
 | SlowFast        |  ID-replaced     |  88.26   & 92.88| 52.64    & 64.83|       1         |
 |                 |  ID-remained     |  52.70   & 61.50| 87.96    & 95.47|                 |
-| MINTIME-XE      |  ID-replaced     |  86.58   & 93.66| 84.02    & 88.43|       2         |
+| MINTIME-XC      |  ID-replaced     |  86.58   & 93.66| 84.02    & 88.43|       2         |
 |                 |  ID-remained     |  64.01   & 68.53| 92.08    & 97.26|                 |
 | MINTIME-EF      |  ID-replaced     |  80.18   & 83.86| 79.03    & 86.98|       2         |
 |                 |  ID-remained     |  63.13   & 66.26| 89.22    & 95.02|                 |

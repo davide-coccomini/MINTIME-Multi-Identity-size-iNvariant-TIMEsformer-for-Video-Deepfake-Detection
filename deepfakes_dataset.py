@@ -30,10 +30,11 @@ RANGE_SIZE = 5
 SIZE_EMB_DICT = [(1+i*RANGE_SIZE, (i+1)*RANGE_SIZE) if i != 0 else (0, RANGE_SIZE) for i in range(20)]
 
 class DeepFakesDataset(Dataset):
-    def __init__(self, videos_paths, labels, data_path, video_path, image_size, augmentation = None, multiclass_labels = None, mode = 'train', model = 0, num_frames = 8, max_identities = 3, num_patches=49):
+    def __init__(self, videos_paths, labels, data_path, video_path, image_size, augmentation = None, multiclass_labels = None, save_attention_plots = False, mode = 'train', model = 0, num_frames = 8, max_identities = 3, num_patches=49):
         self.x = videos_paths
         self.y = labels
         self.multiclass_labels = multiclass_labels
+        self.save_attention_plots = save_attention_plots
         self.data_path = data_path
         self.video_path = video_path
         self.image_size = image_size
@@ -311,6 +312,9 @@ class DeepFakesDataset(Dataset):
             tokens_per_identity = [(os.path.basename(identities[i][0]), identities[i][2]*self.num_patches + identities[i-1][2]*self.num_patches) if i > 0 else (os.path.basename(identities[i][0]), identities[i][2]*self.num_patches) for i in range(len(identities))]     
         else:
             positions = []
+            tokens_per_identity = []
+
+        if self.save_attention_plots == False:
             tokens_per_identity = []
 
         if self.multiclass_labels == None:

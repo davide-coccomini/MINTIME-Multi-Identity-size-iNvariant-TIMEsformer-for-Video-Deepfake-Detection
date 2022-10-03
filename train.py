@@ -35,7 +35,7 @@ from models.xception import xception
 
 
 if __name__ == "__main__":
-    os.environ["CUDA_VISIBLE_DEVICES"] = "3,4,5"
+    os.environ["CUDA_VISIBLE_DEVICES"] = "0,1,2,3,4"
     parser = argparse.ArgumentParser()
     
     parser.add_argument('--train_list_file', default="../../datasets/ForgeryNet/faces/train_and_val.csv", type=str,

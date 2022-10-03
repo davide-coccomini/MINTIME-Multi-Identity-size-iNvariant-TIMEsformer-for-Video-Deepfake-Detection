@@ -128,6 +128,9 @@ class Attention(nn.Module):
         v_ = torch.cat((cls_v, v_), dim = 1)
 
         # attention
+        if not self.enable_identity_attention:
+            mask = [1 for i in range(len(mask))]
+            
         out, attentions = attn(q_, k_, v_, mask = mask)
         # merge back time or space
         out = rearrange(out, f'{einops_to} -> {einops_from}', **einops_dims)
@@ -166,6 +169,8 @@ class SizeInvariantTimeSformer(nn.Module):
         self.ff_dropout = config['model']['ff-dropout']
         self.shift_tokens = config['model']['shift-tokens']
         self.enable_size_emb = config['model']['enable-size-emb']
+        self.enable_pos_emb = config['model']['enable-pos-emb']
+        self.enable_identity_attention = config['model']['enable-identity-attention']
         self.require_attention = require_attention
 
         num_positions = self.num_frames * self.channels
@@ -228,11 +233,11 @@ class SizeInvariantTimeSformer(nn.Module):
         x =  torch.cat((cls_token, tokens), dim = 1)
 
         # Positional 
-        if self.enable_pos_embedding:
+        if self.enable_pos_emb:
             x += self.pos_emb(positions)
         else:
             x += self.pos_emb(torch.arange(x.shape[1]))
-            
+
         # Size embedding
         if self.enable_size_emb:
             size_embedding = repeat(size_embedding, 'b f -> b f p', p=self.num_patches)      # B x 8 x 49   

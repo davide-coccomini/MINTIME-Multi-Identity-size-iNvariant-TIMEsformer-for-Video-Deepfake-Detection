@@ -58,19 +58,19 @@ In this case, the attention in frame 20 of the second identity is particularly h
 ## Model ZOO
 
 ### Models comparison
-| Model | Identities | Training Dataset | Test Dataset | Accuracy | AUC  |  Download |
-| --------------- | --------------- | --------------- |  --------------- | --------------- | --------------- | --------------- |
-| MINTIME-XC | 1 | ForgeryNet | ForgeryNet | 84.98 | 93.28 | LINK |
-| MINTIME-XC | 2 | ForgeryNet | ForgeryNet | 86.40 | 94.08 | LINK |
-| MINTIME-XC | 3 | ForgeryNet | ForgeryNet | 86.05 | 93.93 | LINK |
-| SlowFast R-50 | 1 | ForgeryNet | ForgeryNet | 88.78 | 93.88 | N/A |
-| X3D-M | 1 | ForgeryNet | ForgeryNet | 87.93 | 93.75 | N/A |
-| MINTIME-EF | 1 | ForgeryNet | ForgeryNet | 81.92 | 90.13 | LINK |
-| MINTIME-EF | 2 | ForgeryNet | ForgeryNet | 82.28 | 90.45 | LINK |
-| MINTIME-EF | 3 | ForgeryNet | ForgeryNet | 82.05 | 90.28 | LINK |
-| EfficientNet-B0 + MLP | 1 | ForgeryNet | ForgeryNet | 65.33 | 71.42 | LINK |
-| EfficientNet-B0 + MLP | 2 | ForgeryNet | ForgeryNet | 67.03 | 71.05 | LINK |
-| EfficientNet-B0 + MLP | 3 | ForgeryNet | ForgeryNet | 66.89 | 70.92 | LINK |
+| Model | Identities | Accuracy | AUC  |  Download |
+| --------------- | --------------- | --------------- | --------------- | --------------- |
+| MINTIME-XC | 1 | 84.98 | 93.28 | LINK |
+| MINTIME-XC | 2 | 86.40 | 94.08 | LINK |
+| MINTIME-XC | 3 | 86.05 | 93.93 | LINK |
+| SlowFast R-50 | 1 | 88.78 | 93.88 | N/A |
+| X3D-M | 1 | 87.93 | 93.75 | N/A |
+| MINTIME-EF | 1 | 81.92 | 90.13 | LINK |
+| MINTIME-EF | 2 | 82.28 | 90.45 | LINK |
+| MINTIME-EF | 3 | 82.05 | 90.28 | LINK |
+| EfficientNet-B0 + MLP | 1 | 65.33 | 71.42 | LINK |
+| EfficientNet-B0 + MLP | 2 | 67.03 | 71.05 | LINK |
+| EfficientNet-B0 + MLP | 3 | 66.89 | 70.92 | LINK |
 
 
 ###  Multi-Identity videos only
@@ -96,16 +96,33 @@ Accuracy obtained by the models on the various deepfake generation methods in th
 
 |                 |                 | ID-replaced     | ID-remained     | Identities      |                 
 | --------------- | --------------- | --------------- | --------------- | --------------- |
-|                 |                  | Accuracy & AUC  | Accuracy & AUC  |                 |                 
-| X3D-M           |  ID-replaced     |  87.92   & 92.91| 55.25    & 65.59|       1         |
-|                 |  ID-remained     |  55.93   & 62.87| 88.85    & 95.40|                 |
-| SlowFast        |  ID-replaced     |  88.26   & 92.88| 52.64    & 64.83|       1         |
-|                 |  ID-remained     |  52.70   & 61.50| 87.96    & 95.47|                 |
-| MINTIME-XC      |  ID-replaced     |  86.58   & 93.66| 84.02    & 88.43|       2         |
-|                 |  ID-remained     |  64.01   & 68.53| 92.08    & 97.26|                 |
-| MINTIME-EF      |  ID-replaced     |  80.18   & 83.86| 79.03    & 86.98|       2         |
-|                 |  ID-remained     |  63.13   & 66.26| 89.22    & 95.02|                 |
+|                 |                  | Accuracy  | Accuracy  |                 |                 
+| X3D-M           |  ID-replaced     |  87.92  | 55.25   |       1         |
+|                 |  ID-remained     |  55.93  | 88.85   |                 |
+| SlowFast        |  ID-replaced     |  88.26  | 52.64   |       1         |
+|                 |  ID-remained     |  52.70  | 87.96   |                 |
+| MINTIME-XC      |  ID-replaced     |  86.58  | 84.02   |       2         |
+|                 |  ID-remained     |  64.01  | 92.08   |                 |
+| MINTIME-EF      |  ID-replaced     |  80.18  | 79.03   |       2         |
+|                 |  ID-remained     |  63.13  | 89.22   |                 |
 
+|                 |                 | ID-replaced     | ID-remained     | Identities      |                 
+| --------------- | --------------- | --------------- | --------------- | --------------- |
+|                 |                  |  AUC     |  AUC  |                 |                 
+| X3D-M           |  ID-replaced     |  92.91 |  65.59|       1         |
+|                 |  ID-remained     |  62.87 |  95.40|                 |
+| SlowFast        |  ID-replaced     |  92.88 |  64.83|       1         |
+|                 |  ID-remained     |  61.50 |  95.47|                 |
+| MINTIME-XC      |  ID-replaced     |  93.66 |  88.43|       2         |
+|                 |  ID-remained     |  68.53 |  97.26|                 |
+| MINTIME-EF      |  ID-replaced     |  83.86 |  86.98|       2         |
+|                 |  ID-remained     |  66.26 |  95.02|                 |
+
+### Cross-Dataset Analysis
+| Model | Identities | Training Dataset | Test Dataset | AUC   |
+| --------------- | --------------- | --------------- |  --------------- | ---------------  |
+| MINTIME-XC | 2 | ForgeryNet | DFDC Preview | 77.92 |
+| FTCN | 1 | FaceForensics++ | DFDC Preview | 74.00 |
 
 
 ### Size Embedding evaluation

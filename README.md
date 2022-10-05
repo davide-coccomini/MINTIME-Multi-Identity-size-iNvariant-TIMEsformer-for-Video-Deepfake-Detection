@@ -108,7 +108,7 @@ Accuracy obtained by the models on the various deepfake generation methods in th
 
 |                 |                 | ID-replaced     | ID-remained     | Identities      |                 
 | --------------- | --------------- | --------------- | --------------- | --------------- |
-|                 |                  |  AUC     |  AUC  |                 |                 
+|                 |                  |  AUC   |  AUC  |                 |                 
 | X3D-M           |  ID-replaced     |  92.91 |  65.59|       1         |
 |                 |  ID-remained     |  62.87 |  95.40|                 |
 | SlowFast        |  ID-replaced     |  92.88 |  64.83|       1         |
@@ -136,10 +136,10 @@ Accuracy obtained by the models on the various deepfake generation methods in th
 
 
 ### Size Embedding evaluation
-| Model | Identities | Training Dataset | Test Dataset | Accuracy | AUC  |
-| --------------- | --------------- | --------------- | --------------- | --------------- | --------------- | 
-| MINTIME-EF with size-embedding | 2 | ForgeryNet | ForgeryNet | 82.05 | 90.28 |
-| MINTIME-EF w/o size-embedding | 2 | ForgeryNet | ForgeryNet | 81.83 | 90.13 |
+| Model | Identities | Accuracy | AUC  |
+| --------------- | ---------------  | --------------- | --------------- | 
+| MINTIME-EF with size-embedding | 2 | 82.05 | 90.28 |
+| MINTIME-EF w/o size-embedding | 2 | 81.83 | 90.13 |
 
 # Multi-Identity Approaches evaluation
 

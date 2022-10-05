@@ -60,9 +60,9 @@ In this case, the attention in frame 20 of the second identity is particularly h
 ### Models comparison
 | Model | Identities | Accuracy | AUC  |  Download |
 | --------------- | --------------- | --------------- | --------------- | --------------- |
-| MINTIME-XC | 1 | 84.98 | 93.28 | LINK |
-| MINTIME-XC | 2 | 86.40 | 94.08 | LINK |
-| MINTIME-XC | 3 | 86.05 | 93.93 | LINK |
+| MINTIME-XC | 1 | 85.96 | 93.20 | LINK |
+| MINTIME-XC | 2 | 87.64 | 94.25 | LINK |
+| MINTIME-XC | 3 | 86.98 | 94.10 | LINK |
 | SlowFast R-50 | 1 | 88.78 | 93.88 | N/A |
 | X3D-M | 1 | 87.93 | 93.75 | N/A |
 | MINTIME-EF | 1 | 81.92 | 90.13 | LINK |
@@ -78,7 +78,7 @@ Accuracy obtained from models on multi-identity videos only.
 
 | Model | Accuracy | AUC |
 | ----  |   ----   | ---- |
-| MINTIME-XC | 86.58  | 93.32 |
+| MINTIME-XC | 86.68  | 94.12 |
 | MINTIME-EF | 81.21  | 89.56 |
 | EfficientNet-B0 + MLP | 67.69 | 74.26 |
 
@@ -119,10 +119,20 @@ Accuracy obtained by the models on the various deepfake generation methods in th
 |                 |  ID-remained     |  66.26 |  95.02|                 |
 
 ### Cross-Dataset Analysis
-| Model | Identities | Training Dataset | Test Dataset | AUC   |
-| --------------- | --------------- | --------------- |  --------------- | ---------------  |
-| MINTIME-XC | 2 | ForgeryNet | DFDC Preview | 77.92 |
-| FTCN | 1 | FaceForensics++ | DFDC Preview | 74.00 |
+| Model | Identities | AUC   |
+| --------------- |  --------------- | ---------------  |
+| Face X-ray | 1 | 65.50 |
+| Patch-based | 1 | 65.60 |
+| DSP-FWA | 1 | 67.30 |
+| CSN | 1 | 68.10 |
+| Multi-Task | 1 | 68.10 |
+| CNN-GRU | 1 | 68.90 |
+| Xception | 1 | 70.90 |
+| CNN-aug | 1 | 72.10 |
+| LipForensics | 1 | 73.50 |
+| FTCN | 1 | 74.00 |
+| RealForensics | 1 | 75.90 |
+| MINTIME-XC | 2 | 77.92 |
 
 
 ### Size Embedding evaluation
@@ -130,6 +140,9 @@ Accuracy obtained by the models on the various deepfake generation methods in th
 | --------------- | --------------- | --------------- | --------------- | --------------- | --------------- | 
 | MINTIME-EF with size-embedding | 2 | ForgeryNet | ForgeryNet | 82.05 | 90.28 |
 | MINTIME-EF w/o size-embedding | 2 | ForgeryNet | ForgeryNet | 81.83 | 90.13 |
+
+# Multi-Identity Approaches evaluation
+
 
 
 ## Dataset

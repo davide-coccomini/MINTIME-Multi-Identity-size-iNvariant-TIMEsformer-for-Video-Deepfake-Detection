@@ -30,7 +30,7 @@ RANGE_SIZE = 5
 SIZE_EMB_DICT = [(1+i*RANGE_SIZE, (i+1)*RANGE_SIZE) if i != 0 else (0, RANGE_SIZE) for i in range(20)]
 
 class DeepFakesDataset(Dataset):
-    def __init__(self, videos_paths, labels, data_path, video_path, image_size, augmentation = None, multiclass_labels = None, save_attention_plots = False, mode = 'train', model = 0, num_frames = 8, max_identities = 3, num_patches=49):
+    def __init__(self, videos_paths, labels, data_path, video_path, image_size, augmentation = None, multiclass_labels = None, save_attention_plots = False, mode = 'train', model = 0, num_frames = 8, max_identities = 3, num_patches=49, enable_identity_attention = True):
         self.x = videos_paths
         self.y = labels
         self.multiclass_labels = multiclass_labels
@@ -50,6 +50,7 @@ class DeepFakesDataset(Dataset):
                   2:  [int(num_frames/2), int(num_frames/2)],
                   3:  [int(num_frames/3), int(num_frames/3), int(num_frames/4)],
                   4:  [int(num_frames/3), int(num_frames/3), int(num_frames/8), int(num_frames/8)]}
+        self.enable_identity_attention = enable_identity_attention
 
     
     def create_train_transforms(self, size, additional_targets, augmentation):
@@ -223,7 +224,7 @@ class DeepFakesDataset(Dataset):
                 
                 if len(missing_faces) > 0:
                     identity_faces = identity_faces + missing_faces # Add the missing faces to the identity
-
+                
             identity_faces = np.asarray(sorted(identity_faces, key=lambda x:int(os.path.basename(x).split("_")[0])))
 
             # Select uniformly the frames in an alternate way
@@ -242,7 +243,6 @@ class DeepFakesDataset(Dataset):
             height = capture.get(4) 
             video_area = width*height/2
             identity_size_embeddings = []
-            
             for image_index, image_path in enumerate(identity_faces):
                 # Read face image
                 image = cv2.imread(image_path)
@@ -262,12 +262,14 @@ class DeepFakesDataset(Dataset):
 
 
             # If the readed faces are less than max_faces we need to add empty images and generate the mask
-            if len(identity_images) < max_faces: 
+            if len(identity_images) < max_faces:
                 diff = max_faces - len(identity_size_embeddings)
                 identity_size_embeddings = np.concatenate((identity_size_embeddings, np.zeros(diff)))
                 identity_images.extend([np.zeros((self.image_size, self.image_size, 3), dtype=np.uint8) for i in range(diff)])
-                mask.extend([1 if i < max_faces - diff else 0 for i in range(max_faces)])
                 images_frames.extend([max(images_frames) for i in range(diff)])
+
+            if self.enable_identity_attention: # Calculate attention only between faces of the same identity
+                mask.extend([1 if i < max_faces - diff else 0 for i in range(max_faces)])
             else: # Otherwise all the faces are valid
                 mask.extend([1 for i in range(max_faces)])
 
@@ -283,7 +285,8 @@ class DeepFakesDataset(Dataset):
         if self.mode == 'train':
             transform = self.create_train_transforms(self.image_size, additional_targets, self.augmentation)
         else:
-            transform = self.create_val_transform(self.image_size, additional_targets)  
+            transform = self.create_val_transform(self.image_size, additional_targets) 
+
         if len(sequence) == 8:
             transformed_images = transform(image=sequence[0], image1=sequence[1], image2=sequence[2], image3=sequence[3], image4=sequence[4], image5=sequence[5], image6=sequence[6], image7=sequence[7])
         elif len(sequence) == 16:

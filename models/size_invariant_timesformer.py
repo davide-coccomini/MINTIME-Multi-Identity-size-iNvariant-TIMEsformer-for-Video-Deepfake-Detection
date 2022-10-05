@@ -92,7 +92,7 @@ class Attention(nn.Module):
         dim,
         dim_head = 64,
         heads = 8,
-        dropout = 0.
+        dropout = 0.,
     ):
         super().__init__()
         self.heads = heads
@@ -104,6 +104,7 @@ class Attention(nn.Module):
             nn.Linear(inner_dim, dim),
             nn.Dropout(dropout)
         )
+
 
     def forward(self, x, einops_from, einops_to, mask = None, cls_mask = None, identities_mask = None, rot_emb = None, **einops_dims):
         h = self.heads
@@ -128,10 +129,8 @@ class Attention(nn.Module):
         v_ = torch.cat((cls_v, v_), dim = 1)
 
         # attention
-        if not self.enable_identity_attention:
-            mask = [1 for i in range(len(mask))]
-            
         out, attentions = attn(q_, k_, v_, mask = mask)
+
         # merge back time or space
         out = rearrange(out, f'{einops_to} -> {einops_from}', **einops_dims)
 
@@ -170,7 +169,6 @@ class SizeInvariantTimeSformer(nn.Module):
         self.shift_tokens = config['model']['shift-tokens']
         self.enable_size_emb = config['model']['enable-size-emb']
         self.enable_pos_emb = config['model']['enable-pos-emb']
-        self.enable_identity_attention = config['model']['enable-identity-attention']
         self.require_attention = require_attention
 
         num_positions = self.num_frames * self.channels
@@ -228,15 +226,16 @@ class SizeInvariantTimeSformer(nn.Module):
         n = h * w
         x = rearrange(x, 'b f c h w -> b (f h w) c')                                   # B x F*P*P x C
         tokens = self.to_patch_embedding(x)                                            # B x 8*7*7 x dim
+
         # Add cls token
         cls_token = repeat(self.cls_token, 'n d -> b n d', b = b)
-        x =  torch.cat((cls_token, tokens), dim = 1)
+        x = torch.cat((cls_token, tokens), dim = 1)
 
         # Positional 
         if self.enable_pos_emb:
             x += self.pos_emb(positions)
         else:
-            x += self.pos_emb(torch.arange(x.shape[1]))
+            x += (self.pos_emb(torch.arange(x.shape[1]).to(device)))
 
         # Size embedding
         if self.enable_size_emb:
@@ -248,7 +247,7 @@ class SizeInvariantTimeSformer(nn.Module):
             x += self.size_emb(size_embedding)
        
                 
-        # Frame mask
+        # Frame mask            
         frame_mask = repeat(mask, 'b f1 -> b f2 f1', f2 = self.num_frames)
         frame_mask = torch.logical_and(frame_mask, identities_mask)
         frame_mask = F.pad(frame_mask, (1, 0), value= True)

@@ -92,6 +92,14 @@ Accuracy obtained by the models on the various deepfake generation methods in th
 | EfficientNet-B0 + MLP | 51.68   |  67.67   |  84.41   |  67.58   |   65.80  |  78.68   |  69.72   |  92.87   |  79.04   | 48.31 |
 
 
+### Size Embedding evaluation
+| Model | Identities| Accuracy | AUC  |
+| --------------- | --------------- | --------------- | --------------- | 
+| MINTIME with size-embedding | 2 | 82.05 | 90.28 |
+| MINTIME w/o size-embedding | 2 | 81.83 | 90.13 |
+
+
+
 ### Cross-Forgery Analysis
 
 |                 |                 | ID-replaced     | ID-remained     | Identities      |                 
@@ -135,14 +143,16 @@ Accuracy obtained by the models on the various deepfake generation methods in th
 | MINTIME-XC | 2 | 77.92 |
 
 
-### Size Embedding evaluation
-| Model | Identities | Accuracy | AUC  |
-| --------------- | ---------------  | --------------- | --------------- | 
-| MINTIME-EF with size-embedding | 2 | 82.05 | 90.28 |
-| MINTIME-EF w/o size-embedding | 2 | 81.83 | 90.13 |
 
 ### Multi-Identity Approaches evaluation
-TODO
+Considering only multi-identity videos
+
+| Model | Identities | Temporal Positional Embedding | Multi-Identity Attention | AUC |
+| --------------- | --------------- | --------------- | --------------- | --------------- |
+| MINTIME-XF | 2  |      ✓                            |      ✓         |        94.12    | 
+| MINTIME-XF | 2  |      X                            |      X         |         93.29    |  
+| MINTIME-XF | 3  |      ✓                            |      ✓         |       93.32     |  
+| MINTIME-XF | 3  |      X                            |      X         |        90.57     |  
 
 
 ## Dataset

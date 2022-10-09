@@ -32,6 +32,7 @@ from torch.utils.tensorboard import SummaryWriter
 import torch_optimizer as optim
 from timm.scheduler.cosine_lr import CosineLRScheduler
 from models.baseline import Baseline
+from models.xception import xception
 
 
 
@@ -39,11 +40,11 @@ from models.baseline import Baseline
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     
-    parser.add_argument('--test_list_file', default="../datasets/ForgeryNet/faces/test.csv", type=str,
+    parser.add_argument('--test_list_file', default="../../datasets/ForgeryNet/faces/test.csv", type=str,
                         help='Test List txt file path)')  
-    parser.add_argument('--data_path', default="../datasets/ForgeryNet/faces", type=str,
+    parser.add_argument('--data_path', default="../../datasets/ForgeryNet/faces", type=str,
                         help='Path to the dataset converted into identities.')
-    parser.add_argument('--video_path', default="../datasets/ForgeryNet/videos", type=str,
+    parser.add_argument('--video_path', default="../../datasets/ForgeryNet/videos", type=str,
                         help='Path to the dataset original videos (.mp4 files).')
     parser.add_argument('--deepfake_methods', nargs='*', required=False,
                         help="For ForgeryNet dataset, filter some deepfake methods for partial training.")
@@ -53,6 +54,8 @@ if __name__ == "__main__":
                         help='Random state value')
     parser.add_argument('--model_weights', type=str,
                         help='Model weights.')
+    parser.add_argument('--extractor_model', type=int, default=0, 
+                        help="Which model use for features extraction (0: EfficientNet; 1: XceptionNet).")
     parser.add_argument('--extractor_weights', default='ImageNet', type=str,
                         help='Path to extractor weights or "imagenet".')
     parser.add_argument('--gpu_id', default=0, type=int,
@@ -73,13 +76,16 @@ if __name__ == "__main__":
     with open(opt.config, 'r') as ymlfile:
         config = yaml.safe_load(ymlfile)
 
+    os.environ["CUDA_VISIBLE_DEVICES"] = "6,7"
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+
     # Check for integrity
     if config['model']['num-frames'] != 8 and config['model']['num-frames'] != 16:
         raise Exception("Invalid number of frames.")
         
         
-    # Setup CUDA settings
-    torch.cuda.set_device(opt.gpu_id) 
+    # Setup CUDA settings 
     torch.backends.cudnn.deterministic = True
     random.seed(opt.random_state)
     torch.manual_seed(opt.random_state)
@@ -87,13 +93,19 @@ if __name__ == "__main__":
     np.random.seed(opt.random_state)
    
     # Load required weights for feature extractor
-    if opt.extractor_weights.lower() == 'imagenet':
-        features_extractor = EfficientNet.from_pretrained('efficientnet-b0')
-    else:
-        features_extractor = EfficientNet.from_name('efficientnet-b0')
-        features_extractor.load_matching_state_dict(torch.load(opt.extractor_weights, map_location=torch.device('cpu')))
-        print("Custom features extractor weights loaded.")
-    
+    if opt.extractor_model == 0: # EfficientNet-B0
+        if opt.extractor_weights.lower() == 'imagenet':
+            features_extractor = EfficientNet.from_pretrained('efficientnet-b0')
+        else:
+            features_extractor = EfficientNet.from_name('efficientnet-b0')
+            features_extractor.load_matching_state_dict(torch.load(opt.extractor_weights, map_location=torch.device('cpu')))
+            print("Custom features extractor weights loaded.")
+    else: # XceptionNet
+        if opt.extractor_weights.lower() == 'pretrained':
+            features_extractor = xception(num_classes=1, pretrain_path="weights/ckpt_iter.pth.tar")
+        else:
+            features_extractor = xception(num_classes=1, pretrain_path=opt.extractor_weights)
+
     # Init the required model
     if opt.model == 0:
         model = Baseline(config=config)
@@ -103,18 +115,22 @@ if __name__ == "__main__":
         num_patches = config['model']['num-patches']
 
     
+    features_extractor = torch.nn.DataParallel(features_extractor)
+    model = torch.nn.DataParallel(model)
+
+
     if os.path.exists(opt.model_weights):
-        model.load_state_dict(torch.load(opt.model_weights, map_location=torch.device('cpu')))
+        model.load_state_dict(torch.load(opt.model_weights))
     else:
         raise Exception("No checkpoint loaded for the model.")    
 
     loss_fn = torch.nn.BCEWithLogitsLoss()
 
     # Move into GPU
-    features_extractor = features_extractor.to(opt.gpu_id)   
+    features_extractor = features_extractor.to(device)   
     print("Extractor Parameters: ", count_parameters(features_extractor))  
     print("Model Parameters: ", count_parameters(model)) 
-    model = model.to(opt.gpu_id)
+    model = model.to(device)
     features_extractor.eval()
     model.eval()
        
@@ -157,7 +173,7 @@ if __name__ == "__main__":
     test_samples = len(test_videos)
 
     # Create the data loaders 
-    test_dataset = DeepFakesDataset(test_videos, test_labels, multiclass_labels = multiclass_labels, image_size=config['model']['image-size'], data_path=opt.data_path, video_path=opt.video_path, num_frames=config['model']['num-frames'], num_patches=num_patches, max_identities=config['model']['max-identities'], mode='test')
+    test_dataset = DeepFakesDataset(test_videos, test_labels, multiclass_labels = multiclass_labels, image_size=config['model']['image-size'], data_path=opt.data_path, video_path=opt.video_path, num_frames=config['model']['num-frames'], num_patches=num_patches, max_identities=config['model']['max-identities'], enable_identity_attention=config['model']['enable-identity-attention'], mode='test')
     test_dl = torch.utils.data.DataLoader(test_dataset, batch_size=config['test']['bs'], shuffle=False, sampler=None,
                                     batch_sampler=None, num_workers=opt.workers, collate_fn=None,
                                     pin_memory=False, drop_last=False, timeout=0,
@@ -189,22 +205,20 @@ if __name__ == "__main__":
     for index, (videos, size_embeddings, masks, identities_masks, positions, tokens_per_identity, labels, multiclass_labels, video_ids) in enumerate(test_dl):
         b, f, h, w, c = videos.shape
         labels = labels.unsqueeze(1).float()
-        videos = videos.to(opt.gpu_id)
-        identities_masks = identities_masks.to(opt.gpu_id)
-        masks = masks.to(opt.gpu_id)
-        positions = positions.to(opt.gpu_id)
+        videos = videos.to(device)
+        identities_masks = identities_masks.to(device)
+        masks = masks.to(device)
+        positions = positions.to(device)
 
         with torch.no_grad():
             videos = rearrange(videos, "b f h w c -> (b f) c h w")
             features = features_extractor(videos)  
-
             if opt.model == 0: 
                 test_pred = model(features)
                 test_pred = torch.mean(test_pred.reshape(-1, config["model"]["num-frames"]), axis=1).unsqueeze(1)
             elif opt.model == 1:
-                features = rearrange(features, '(b f) c h w -> b f c h w', b = b, f = f)   
+                features = rearrange(features, '(b f) c h w -> b f c h w', b = b, f = f)
                 test_pred, attentions = model(features, mask=masks, size_embedding=size_embeddings, identities_mask=identities_masks, positions=positions)
-                
                 if opt.save_attentions:
                     identity_names = [row[0] for row in tokens_per_identity]
                     frames_per_identity = [int(row[1] / config["model"]["num-patches"]) for row in tokens_per_identity]
@@ -215,6 +229,7 @@ if __name__ == "__main__":
 
         videos = videos.cpu()
         test_pred = test_pred.cpu()
+        
         test_loss = loss_fn(test_pred, labels)
         total_test_loss += round(test_loss.item(), 2)
         corrects, positive_class, negative_class, multiclass_errors, batch_errors = check_correct(test_pred, labels, multiclass_labels, multiclass_errors, video_ids)

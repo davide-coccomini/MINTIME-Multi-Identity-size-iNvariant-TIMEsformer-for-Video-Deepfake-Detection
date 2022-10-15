@@ -4,7 +4,6 @@ import numpy as np
 import argparse
 from tqdm import tqdm
 import math
-import random
 import yaml
 from utils import check_correct, aggregate_attentions, save_attention_plots, count_parameters
 from torch.optim.lr_scheduler import LambdaLR
@@ -171,7 +170,6 @@ if __name__ == "__main__":
                 
         df_test.drop(df_test.index[indexes_to_drop], inplace=True)
             
-    print("df_test",len(df_test))
     # Split videos and labels and reduce to the required number of videos
     test_videos = df_test['video'].tolist()
     test_labels = df_test['label'].tolist()

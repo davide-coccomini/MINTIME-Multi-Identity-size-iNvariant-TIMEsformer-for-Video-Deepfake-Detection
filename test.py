@@ -4,6 +4,7 @@ import numpy as np
 import argparse
 from tqdm import tqdm
 import math
+import random
 import yaml
 from utils import check_correct, aggregate_attentions, save_attention_plots, count_parameters
 from torch.optim.lr_scheduler import LambdaLR
@@ -68,6 +69,8 @@ if __name__ == "__main__":
                         help="Which configuration to use. See into 'config' folder.")
     parser.add_argument('--model', type=int, 
                         help="Which model to use. (0: Baseline | 1: Size Invariant TimeSformer).")
+    parser.add_argument('--identities_ordering', type=int,  default = 0,
+                        help="Which ordering rule to use. (0: Size-based | 1: Length-based | 2: Random).")
     parser.add_argument('--save_attentions', default=False, action="store_true",
                         help='Save attentions plots.')
     opt = parser.parse_args()
@@ -76,7 +79,7 @@ if __name__ == "__main__":
     with open(opt.config, 'r') as ymlfile:
         config = yaml.safe_load(ymlfile)
 
-    os.environ["CUDA_VISIBLE_DEVICES"] = "6,7"
+    os.environ["CUDA_VISIBLE_DEVICES"] = "1,2,3"
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
@@ -155,11 +158,20 @@ if __name__ == "__main__":
         indexes_to_drop = []
         for index, row in df_test.iterrows():
             video_path = os.path.join(opt.data_path, row['video']) 
-            if len(os.listdir(video_path)) < 2:
+            folders = os.listdir(video_path)
+            if len(folders) < 2:
                 indexes_to_drop.append(index)
+            else:
+                counter = 0
+                for folder in folders:
+                    if os.path.isdir(os.path.join(opt.data_path, row['video'], folder)):
+                        counter += 1
+                if counter < 2:
+                    indexes_to_drop.append(index)
                 
         df_test.drop(df_test.index[indexes_to_drop], inplace=True)
             
+    print("df_test",len(df_test))
     # Split videos and labels and reduce to the required number of videos
     test_videos = df_test['video'].tolist()
     test_labels = df_test['label'].tolist()
@@ -173,7 +185,7 @@ if __name__ == "__main__":
     test_samples = len(test_videos)
 
     # Create the data loaders 
-    test_dataset = DeepFakesDataset(test_videos, test_labels, multiclass_labels = multiclass_labels, image_size=config['model']['image-size'], data_path=opt.data_path, video_path=opt.video_path, num_frames=config['model']['num-frames'], num_patches=num_patches, max_identities=config['model']['max-identities'], enable_identity_attention=config['model']['enable-identity-attention'], mode='test')
+    test_dataset = DeepFakesDataset(test_videos, test_labels, multiclass_labels = multiclass_labels, image_size=config['model']['image-size'], data_path=opt.data_path, video_path=opt.video_path, num_frames=config['model']['num-frames'], num_patches=num_patches, max_identities=config['model']['max-identities'], enable_identity_attention=config['model']['enable-identity-attention'], identities_ordering = opt.identities_ordering, mode='test')
     test_dl = torch.utils.data.DataLoader(test_dataset, batch_size=config['test']['bs'], shuffle=False, sampler=None,
                                     batch_sampler=None, num_workers=opt.workers, collate_fn=None,
                                     pin_memory=False, drop_last=False, timeout=0,

@@ -9,6 +9,7 @@
 import torch
 from torch.utils.data import DataLoader, TensorDataset, Dataset
 import cv2 
+import random
 import numpy as np
 from datetime import datetime
 import os
@@ -30,7 +31,7 @@ RANGE_SIZE = 5
 SIZE_EMB_DICT = [(1+i*RANGE_SIZE, (i+1)*RANGE_SIZE) if i != 0 else (0, RANGE_SIZE) for i in range(20)]
 
 class DeepFakesDataset(Dataset):
-    def __init__(self, videos_paths, labels, data_path, video_path, image_size, augmentation = None, multiclass_labels = None, save_attention_plots = False, mode = 'train', model = 0, num_frames = 8, max_identities = 3, num_patches=49, enable_identity_attention = True):
+    def __init__(self, videos_paths, labels, data_path, video_path, image_size, augmentation = None, multiclass_labels = None, save_attention_plots = False, mode = 'train', model = 0, num_frames = 8, max_identities = 3, num_patches=49, enable_identity_attention = True, identities_ordering = 0):
         self.x = videos_paths
         self.y = labels
         self.multiclass_labels = multiclass_labels
@@ -51,7 +52,7 @@ class DeepFakesDataset(Dataset):
                   3:  [int(num_frames/3), int(num_frames/3), int(num_frames/4)],
                   4:  [int(num_frames/3), int(num_frames/3), int(num_frames/8), int(num_frames/8)]}
         self.enable_identity_attention = enable_identity_attention
-
+        self.identities_ordering = identities_ordering
     
     def create_train_transforms(self, size, additional_targets, augmentation):
         if augmentation == "min":
@@ -131,14 +132,20 @@ class DeepFakesDataset(Dataset):
             # Sort faces based on temporal order
             sorted_identities.append(self.get_identity_information(identity))
         
+        
         # If no faces have been found, use the discarded faces
         if len(sorted_identities) == 0:
             sorted_identities.append(self.get_identity_information(os.path.dirname(discarded_faces[0])))
             discarded_faces = []
 
-        # Sort identities based on faces size
-        sorted_identities = sorted(sorted_identities, key=lambda x:x[1], reverse=True)
-        
+        # Sort identities
+        if self.identities_ordering == 0: # Based on faces size 
+            sorted_identities = sorted(sorted_identities, key=lambda x:x[1], reverse=True)
+        elif self.identities_ordering == 1: # Based on identities length
+            sorted_identities = sorted(sorted_identities, key=lambda x:x[2], reverse=True)
+        else: # Random shuffle
+            random.shuffle(sorted_identities)
+
         if len(sorted_identities) > self.max_identities:
             sorted_identities = sorted_identities[:self.max_identities]
             
@@ -204,6 +211,7 @@ class DeepFakesDataset(Dataset):
 
 
         identities, discarded_faces = self.get_sorted_identities(video_path)
+  
         mask = []
         last_range_end = 0
         sequence = []
@@ -268,7 +276,7 @@ class DeepFakesDataset(Dataset):
                 identity_images.extend([np.zeros((self.image_size, self.image_size, 3), dtype=np.uint8) for i in range(diff)])
                 images_frames.extend([max(images_frames) for i in range(diff)])
 
-            if self.enable_identity_attention: # Calculate attention only between faces of the same identity
+            if self.enable_identity_attention and len(identity_images) < max_faces: # Calculate attention only between faces of the same identity
                 mask.extend([1 if i < max_faces - diff else 0 for i in range(max_faces)])
             else: # Otherwise all the faces are valid
                 mask.extend([1 for i in range(max_faces)])

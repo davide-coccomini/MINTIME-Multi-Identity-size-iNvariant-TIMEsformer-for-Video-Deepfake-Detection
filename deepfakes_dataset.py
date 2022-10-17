@@ -299,6 +299,8 @@ class DeepFakesDataset(Dataset):
             transformed_images = transform(image=sequence[0], image1=sequence[1], image2=sequence[2], image3=sequence[3], image4=sequence[4], image5=sequence[5], image6=sequence[6], image7=sequence[7])
         elif len(sequence) == 16:
             transformed_images = transform(image=sequence[0], image1=sequence[1], image2=sequence[2], image3=sequence[3], image4=sequence[4], image5=sequence[5], image6=sequence[6], image7=sequence[7], image8=sequence[8], image9=sequence[9], image10=sequence[10], image11=sequence[11], image12=sequence[12], image13=sequence[13], image14=sequence[14], image15=sequence[15])
+        elif len(sequence) == 32:
+            transformed_images = transform(image=sequence[0], image1=sequence[1], image2=sequence[2], image3=sequence[3], image4=sequence[4], image5=sequence[5], image6=sequence[6], image7=sequence[7], image8=sequence[8], image9=sequence[9], image10=sequence[10], image11=sequence[11], image12=sequence[12], image13=sequence[13], image14=sequence[14], image15=sequence[15], image16=sequence[16], image17=sequence[17], image18=sequence[18], image19=sequence[19], image20=sequence[20], image21=sequence[21], image22=sequence[22], image23=sequence[23], image24=sequence[24], image25=sequence[25], image26=sequence[26], image27=sequence[27], image28=sequence[28], image29=sequence[29], image30=sequence[30], image31=sequence[31])
         else:
             raise Exception("Invalid number of frames.")
 

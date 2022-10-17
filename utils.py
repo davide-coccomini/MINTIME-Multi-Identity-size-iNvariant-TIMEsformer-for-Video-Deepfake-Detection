@@ -8,7 +8,22 @@ from scipy.special import softmax
 from einops import rearrange
 from statistics import mean
 import cv2
-import datetime
+import math
+from typing import Dict
+import json
+import urllib
+from torchvision.transforms import Compose, Lambda
+from torchvision.transforms._transforms_video import (
+    CenterCropVideo,
+    NormalizeVideo,
+)
+from pytorchvideo.data.encoded_video import EncodedVideo
+from pytorchvideo.transforms import (
+    ApplyTransformToKey,
+    ShortSideScale,
+    UniformTemporalSubsample,
+    UniformCropVideo
+) 
 
 PLOTS_NAMES = ["space", "time", "combined"]
 
@@ -26,7 +41,7 @@ def check_correct(preds, labels, multiclass_labels = None, multiclass_errors = N
         if labels[i] == pred:
             correct += 1
         if labels[i] != pred:
-            if multiclass_labels != None:
+            if multiclass_labels is not None and not math.isnan(multiclass_labels[i]):
                 multiclass_errors[multiclass_labels[i].item()][0] += 1
             if videos_ids != None:
                 videos_errors.append(videos_ids[i])
@@ -122,3 +137,50 @@ def draw_border(img, pt1, pt2, color, thickness, r, d):
 
 def count_parameters(model):
     return sum(p.numel() for p in model.parameters() if p.requires_grad)
+
+
+
+
+SLOWFAST_ALPHA = 4
+
+class PackPathway(torch.nn.Module):
+    """
+    Transform for converting video frames as a list of tensors. 
+    """
+    def __init__(self):
+        super().__init__()
+        
+    def forward(self, frames: torch.Tensor):
+        fast_pathway = frames
+        # Perform temporal sampling from the fast pathway.
+        slow_pathway = torch.index_select(
+            frames,
+            1,
+            torch.linspace(
+                0, frames.shape[1] - 1, frames.shape[1] // SLOWFAST_ALPHA
+            ).long(),
+        )
+        frame_list = [slow_pathway, fast_pathway]
+        return frame_list
+
+def slowfast_input_transform(videos, crop_size = 256, side_size = 256, num_frames = 32, sampling_rate = 2, frames_per_second = 30, mean = [0.45, 0.45, 0.45], std = [0.225, 0.225, 0.225]):
+    transform=Compose(
+        [
+            UniformTemporalSubsample(num_frames),
+            Lambda(lambda x: x/255.0),
+            NormalizeVideo(mean, std),
+            ShortSideScale(
+                size=side_size
+            ),
+            CenterCropVideo(crop_size),
+            PackPathway()
+        ]
+    )
+    transformed_videos = [[],[]]
+    for video in videos:
+        output = transform(video)
+        transformed_videos[0].append(output[0])
+        transformed_videos[1].append(output[1])
+    
+        
+    return transformed_videos

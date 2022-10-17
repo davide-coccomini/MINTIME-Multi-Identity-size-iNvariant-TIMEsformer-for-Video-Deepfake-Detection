@@ -6,7 +6,7 @@ import argparse
 from tqdm import tqdm
 import math
 import yaml
-from utils import check_correct, unix_time_millis
+from utils import check_correct, unix_time_millis, slowfast_input_transform
 from torch.optim.lr_scheduler import LambdaLR
 from datetime import datetime, timedelta
 from statistics import mean
@@ -32,10 +32,12 @@ import torch_optimizer as optim
 from timm.scheduler.cosine_lr import CosineLRScheduler
 from models.baseline import Baseline
 from models.xception import xception
+import pytorchvideo
+from pytorchvideo.models.hub.slowfast import _slowfast
 
 
 if __name__ == "__main__":
-    os.environ["CUDA_VISIBLE_DEVICES"] = "0,1,2,3"
+    os.environ["CUDA_VISIBLE_DEVICES"] = "1,2,3,4"
     parser = argparse.ArgumentParser()
     
     parser.add_argument('--train_list_file', default="../../datasets/ForgeryNet/faces/train_and_val.csv", type=str,
@@ -73,11 +75,13 @@ if __name__ == "__main__":
     parser.add_argument('--config', type=str, 
                         help="Which configuration to use. See into 'config' folder.")
     parser.add_argument('--model', type=int, 
-                        help="Which model to use. (0: Baseline | 1: Size Invariant TimeSformer).")
+                        help="Which model to use. (0: Baseline | 1: Size Invariant TimeSformer | 2: SlowFast).")
     parser.add_argument('--patience', type=int, default=5, 
                         help="How many epochs wait before stopping for validation loss not improving.")
     parser.add_argument('--logger_name', default='runs/train',
                         help='Path to save the model and Tensorboard log.')
+    parser.add_argument('--identities_ordering', type=int,  default = 0,
+                        help="Which ordering rule to use. (0: Size-based | 1: Length-based | 2: Random).")
     parser.add_argument('--models_output_path', default='"outputs/models"',
                         help='Output path for checkpoints.')
     opt = parser.parse_args()
@@ -87,7 +91,7 @@ if __name__ == "__main__":
         config = yaml.safe_load(ymlfile)
 
     # Check for integrity
-    if config['model']['num-frames'] != 8 and config['model']['num-frames'] != 16:
+    if config['model']['num-frames'] != 8 and config['model']['num-frames'] != 16 and config['model']['num-frames'] != 32:
         raise Exception("Invalid number of frames.")
         
     # Setup CUDA settings
@@ -107,48 +111,63 @@ if __name__ == "__main__":
     os.makedirs(opt.models_output_path, exist_ok=True)
 
     # Load required weights for feature extractor
-    if opt.extractor_model == 0: # EfficientNet-B0
-        if opt.extractor_weights.lower() == 'imagenet':
-            features_extractor = EfficientNet.from_pretrained('efficientnet-b0')
-        else:
-            features_extractor = EfficientNet.from_name('efficientnet-b0')
-            features_extractor.load_matching_state_dict(torch.load(opt.extractor_weights, map_location=torch.device('cpu')))
-            print("Custom features extractor weights loaded.")
-    else: # XceptionNet
-        if opt.extractor_weights.lower() == 'pretrained':
-            features_extractor = xception(num_classes=1, pretrain_path="weights/ckpt_iter.pth.tar")
-        else:
-            features_extractor = xception(num_classes=1, pretrain_path=opt.extractor_weights)
-
+    if opt.model != 2: 
+        if opt.extractor_model == 0: # EfficientNet-B0
+            if opt.extractor_weights.lower() == 'imagenet':
+                features_extractor = EfficientNet.from_pretrained('efficientnet-b0')
+            else:
+                features_extractor = EfficientNet.from_name('efficientnet-b0')
+                features_extractor.load_matching_state_dict(torch.load(opt.extractor_weights, map_location=torch.device('cpu')))
+                print("Custom features extractor weights loaded.")
+        else: # XceptionNet
+            if opt.extractor_weights.lower() == 'pretrained':
+                features_extractor = xception(num_classes=1, pretrain_path="weights/ckpt_iter.pth.tar")
+            else:
+                features_extractor = xception(num_classes=1, pretrain_path=opt.extractor_weights)
+    else:
+        features_extractor = None
     # Init the required model
     if opt.model == 0:
         model = Baseline(config=config)
         num_patches = None
-    else:   
+    elif opt.model == 1:    
         model = SizeInvariantTimeSformer(config=config)
         num_patches = config['model']['num-patches']
+    elif opt.model == 2:
+        torch.hub._validate_not_a_forked_repo=lambda a,b,c: True
+        model = torch.hub.load('facebookresearch/pytorchvideo', 'slowfast_r50', pretrained=True)   
+        '''
+        model = _slowfast(checkpoint_path='weights/SLOWFAST_4x16_R50.pyth')
+        '''
+        output_layer = torch.nn.Linear(2304 , 1)
+        model.blocks[6].proj = output_layer
+        num_patches = None
 
-    # Setup the requiring grad layers for features extractor
-    if opt.freeze_backbone:
-        features_extractor.eval()
-    else:
-        features_extractor.train()
-        if opt.extractor_unfreeze_blocks > -1:
-            for name, param in features_extractor.named_parameters():
-                if "blocks" in name:
-                    param_block = int(name.split(".")[1])
-                    if param_block >= 16 - opt.extractor_unfreeze_blocks:
-                        param.requires_grad = True
-                    else:
-                        param.requires_grad = False
-                else:                    
-                    param.requires_grad = False
+
+
+# Setup the requiring grad layers for features extractor
+    if features_extractor is not None:
+        if opt.freeze_backbone:
+            features_extractor.eval()
         else:
-            for name, param in features_extractor.named_parameters():
-                param.requires_grad = True
+            features_extractor.train()
+            if opt.extractor_unfreeze_blocks > -1:
+                for name, param in features_extractor.named_parameters():
+                    if "blocks" in name:
+                        param_block = int(name.split(".")[1])
+                        if param_block >= 16 - opt.extractor_unfreeze_blocks:
+                            param.requires_grad = True
+                        else:
+                            param.requires_grad = False
+                    else:                    
+                        param.requires_grad = False
+            else:
+                for name, param in features_extractor.named_parameters():
+                    param.requires_grad = True
 
-    # Move models to GPU 
-    features_extractor = features_extractor.to(device)    
+        # Move models to GPU 
+        features_extractor = features_extractor.to(device)   
+
     model = model.to(device)
     model.train()
     
@@ -237,14 +256,14 @@ if __name__ == "__main__":
     loss_fn = torch.nn.BCEWithLogitsLoss(pos_weight=torch.tensor([class_weights]))
 
     # Create the data loaders 
-    train_dataset = DeepFakesDataset(train_videos, train_labels, augmentation=config['training']['augmentation'], image_size=config['model']['image-size'], data_path=opt.data_path, video_path=opt.video_path, num_frames=config['model']['num-frames'], num_patches=num_patches, max_identities=config['model']['max-identities'], enable_identity_attention=config['model']['enable-identity-attention'])
+    train_dataset = DeepFakesDataset(train_videos, train_labels, augmentation=config['training']['augmentation'], image_size=config['model']['image-size'], data_path=opt.data_path, video_path=opt.video_path, num_frames=config['model']['num-frames'], num_patches=num_patches, max_identities=config['model']['max-identities'], enable_identity_attention=config['model']['enable-identity-attention'], identities_ordering = opt.identities_ordering)
     train_dl = torch.utils.data.DataLoader(train_dataset, batch_size=config['training']['bs'], shuffle=True, sampler=None,
                                  batch_sampler=None, num_workers=opt.workers, collate_fn=None,
                                  pin_memory=False, drop_last=False, timeout=0,
                                  worker_init_fn=None, prefetch_factor=2,
                                  persistent_workers=False)
 
-    validation_dataset = DeepFakesDataset(validation_videos, validation_labels, image_size=config['model']['image-size'], data_path=opt.data_path, video_path=opt.video_path, num_frames=config['model']['num-frames'], num_patches=num_patches, max_identities=config['model']['max-identities'], enable_identity_attention=config['model']['enable-identity-attention'], mode='val')
+    validation_dataset = DeepFakesDataset(validation_videos, validation_labels, image_size=config['model']['image-size'], data_path=opt.data_path, video_path=opt.video_path, num_frames=config['model']['num-frames'], num_patches=num_patches, max_identities=config['model']['max-identities'], enable_identity_attention=config['model']['enable-identity-attention'], identities_ordering = opt.identities_ordering, mode='val')
     val_dl = torch.utils.data.DataLoader(validation_dataset, batch_size=config['training']['val_bs'], shuffle=True, sampler=None,
                                     batch_sampler=None, num_workers=opt.workers, collate_fn=None,
                                     pin_memory=False, drop_last=False, timeout=0,
@@ -309,26 +328,33 @@ if __name__ == "__main__":
             start_time = datetime.now()
             b, f, h, w, c = videos.shape
             labels = labels.unsqueeze(1).float()
-            videos = videos.to(device)
             identities_masks = identities_masks.to(device)
             masks = masks.to(device)
             positions = positions.to(device)
-            videos = rearrange(videos, "b f h w c -> (b f) c h w")
-            if opt.freeze_backbone:
-                with torch.no_grad():
-                    features = features_extractor(videos)  
-            else:
-                features = features_extractor(videos) 
-
-            if opt.model == 0: # Baseline
-                y_pred = model(features)
-                y_pred = torch.mean(y_pred.reshape(-1, config["model"]["num-frames"]), axis=1).unsqueeze(1)
-            elif opt.model == 1: # Size-Invariant TimeSformer
-                features = rearrange(features, '(b f) c h w -> b f c h w', b = b, f = f)
-                y_pred = model(features, mask=masks, size_embedding=size_embeddings, identities_mask=identities_masks, positions=positions)
             
+            if opt.model != 2: # Use the features extractor
+                videos = rearrange(videos, "b f h w c -> (b f) c h w")
+                videos = videos.to(device)
+
+                if opt.freeze_backbone:
+                    with torch.no_grad():
+                        features = features_extractor(videos)  
+                else:
+                    features = features_extractor(videos) 
+
+                if opt.model == 0: # Baseline
+                    y_pred = model(features)
+                    y_pred = torch.mean(y_pred.reshape(-1, config["model"]["num-frames"]), axis=1).unsqueeze(1)
+                elif opt.model == 1: # Size-Invariant TimeSformer
+                    features = rearrange(features, '(b f) c h w -> b f c h w', b = b, f = f)
+                    y_pred = model(features, mask=masks, size_embedding=size_embeddings, identities_mask=identities_masks, positions=positions)
+            else: # SlowFast
+                videos = rearrange(videos, 'b f h w c -> b c f h w')
+                videos = slowfast_input_transform(videos)
+                videos = [torch.cat([v[None, ...].to(device) for v in videos[0]]), torch.cat([v[None, ...].to(device) for v in videos[1]])]
+                y_pred = model(videos)
+                
             # Calculate loss
-            videos = videos.cpu()
             y_pred = y_pred.cpu()
             loss = loss_fn(y_pred, labels)
             corrects, positive_class, negative_class = check_correct(y_pred, labels)  
@@ -348,12 +374,13 @@ if __name__ == "__main__":
             # Update time per epoch
             time_diff = unix_time_millis(datetime.now() - start_time)
             
+            bar.next()
+
             # Print intermediate metrics
             if index%100 == 0:
                 expected_time = str(datetime.fromtimestamp((time_diff)*(total_batches-index)/1000).strftime('%H:%M:%S.%f'))
                 print("\nLoss: ", total_loss/counter, "Accuracy: ", train_correct/(counter*config['training']['bs']) ,"Train 0s: ", negative, "Train 1s:", positive, "Expected Time:", expected_time)
 
-            bar.next()
 
         # Clean variables before moving into validation
         #torch.cuda.empty_cache() 
@@ -368,7 +395,6 @@ if __name__ == "__main__":
         # Epoch validation loop
         for index, (videos, size_embeddings, masks, identities_masks, positions, labels) in enumerate(val_dl):
             b, f, _, _, _= videos.shape
-            videos = videos.to(device)
             masks = masks.to(device)
             positions = positions.to(device)
             identities_masks = identities_masks.to(device)
@@ -377,17 +403,24 @@ if __name__ == "__main__":
             # Do not update the gradient during validation
             with torch.no_grad():
                 if opt.model == 0: 
+                    videos = videos.to(device)
                     videos = rearrange(videos, 'b f h w c -> (b f) c h w')  
                     features = features_extractor(videos)  
                     val_pred = model(features)
                     val_pred = torch.mean(val_pred.reshape(-1, config["model"]["num-frames"]), axis=1).unsqueeze(1)
                 elif opt.model == 1:
+                    videos = videos.to(device)
                     videos = rearrange(videos, 'b f h w c -> (b f) c h w')                                       # B*8 x 3 x 224 x 224
                     features = features_extractor(videos)                                           # B*8 x 1280 x 7 x 7
                     features = rearrange(features, '(b f) c h w -> b f c h w', b = b, f = f)   
                     val_pred = model(features, mask=masks, size_embedding=size_embeddings, identities_mask=identities_masks, positions=positions)
+                elif opt.model == 2:
+                    videos = rearrange(videos, 'b f h w c -> b c f h w')
+                    videos = slowfast_input_transform(videos)
+                    videos = [torch.cat([v[None, ...].to(device) for v in videos[0]]), torch.cat([v[None, ...].to(device) for v in videos[1]])]
+                    val_pred = model(videos)
+                    
 
-                videos = videos.cpu()
                 val_pred = val_pred.cpu()
                 val_loss = loss_fn(val_pred, labels)
                 total_val_loss += round(val_loss.item(), 2)
@@ -416,7 +449,8 @@ if __name__ == "__main__":
 
         # Save checkpoint if the model's validation loss is improving
         if previous_loss > total_val_loss:
-            torch.save(features_extractor.state_dict(), os.path.join(opt.models_output_path,  "Extractor_checkpoint" + str(t)))
+            if opt.model != 2:
+                torch.save(features_extractor.state_dict(), os.path.join(opt.models_output_path,  "Extractor_checkpoint" + str(t)))
             torch.save(model.state_dict(), os.path.join(opt.models_output_path,  "Model_checkpoint" + str(t)))
 
         previous_loss = total_val_loss

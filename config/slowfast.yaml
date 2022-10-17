@@ -1,0 +1,22 @@
+training:
+  lr: 0.01
+  weight-decay: 0.0001
+  bs: 64
+  val_bs: 64
+  optimizer: 'SGD'
+  scheduler: 'cosinelr' 
+  gamma: 0.1
+  step-size: 5
+  augmentation: 'max' # min/max
+
+test:
+  bs: 128
+
+model:
+  image-size: 256
+  num-classes: 1
+  num-frames: 16
+  max-identities: 1
+  enable-size-emb: False
+  enable-pos-emb: False
+  enable-identity-attention: False

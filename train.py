@@ -34,10 +34,11 @@ from models.baseline import Baseline
 from models.xception import xception
 import pytorchvideo
 from pytorchvideo.models.hub.slowfast import _slowfast
-
+from contextlib import redirect_stderr
+import sys
 
 if __name__ == "__main__":
-    os.environ["CUDA_VISIBLE_DEVICES"] = "1,2,3,4"
+    os.environ["CUDA_VISIBLE_DEVICES"] = "0,1"
     parser = argparse.ArgumentParser()
     
     parser.add_argument('--train_list_file', default="../../datasets/ForgeryNet/faces/train_and_val.csv", type=str,
@@ -80,6 +81,8 @@ if __name__ == "__main__":
                         help="How many epochs wait before stopping for validation loss not improving.")
     parser.add_argument('--logger_name', default='runs/train',
                         help='Path to save the model and Tensorboard log.')
+    parser.add_argument('--errors_logs_file', default=None,
+                        help='Path to save the error logs.')
     parser.add_argument('--identities_ordering', type=int,  default = 0,
                         help="Which ordering rule to use. (0: Size-based | 1: Length-based | 2: Random).")
     parser.add_argument('--models_output_path', default='"outputs/models"',
@@ -89,6 +92,10 @@ if __name__ == "__main__":
     print(opt)
     with open(opt.config, 'r') as ymlfile:
         config = yaml.safe_load(ymlfile)
+
+    # Log errors to file
+    if opt.errors_logs_file is not None:
+        sys.stderr  = open(opt.errors_logs_file, "w")
 
     # Check for integrity
     if config['model']['num-frames'] != 8 and config['model']['num-frames'] != 16 and config['model']['num-frames'] != 32:
@@ -136,16 +143,13 @@ if __name__ == "__main__":
     elif opt.model == 2:
         torch.hub._validate_not_a_forked_repo=lambda a,b,c: True
         model = torch.hub.load('facebookresearch/pytorchvideo', 'slowfast_r50', pretrained=True)   
-        '''
-        model = _slowfast(checkpoint_path='weights/SLOWFAST_4x16_R50.pyth')
-        '''
         output_layer = torch.nn.Linear(2304 , 1)
         model.blocks[6].proj = output_layer
         num_patches = None
 
 
 
-# Setup the requiring grad layers for features extractor
+    # Setup the requiring grad layers for features extractor
     if features_extractor is not None:
         if opt.freeze_backbone:
             features_extractor.eval()
@@ -278,7 +282,7 @@ if __name__ == "__main__":
         lr_scheduler = CosineLRScheduler(
                 optimizer,
                 t_initial=num_steps,
-                lr_min=config['training']['lr'] * 1e-2,
+                lr_min=config['training']['lr'] * 1e-1,
                 cycle_limit=1,
                 t_in_epochs=False,
         )
@@ -355,6 +359,8 @@ if __name__ == "__main__":
                 y_pred = model(videos)
                 
             # Calculate loss
+            
+            videos = [torch.cat([v[None, ...].cpu() for v in videos[0]]), torch.cat([v[None, ...].cpu() for v in videos[1]])]
             y_pred = y_pred.cpu()
             loss = loss_fn(y_pred, labels)
             corrects, positive_class, negative_class = check_correct(y_pred, labels)  
@@ -420,7 +426,8 @@ if __name__ == "__main__":
                     videos = [torch.cat([v[None, ...].to(device) for v in videos[0]]), torch.cat([v[None, ...].to(device) for v in videos[1]])]
                     val_pred = model(videos)
                     
-
+                videos = [torch.cat([v[None, ...].cpu() for v in videos[0]]), torch.cat([v[None, ...].cpu() for v in videos[1]])]
+                   
                 val_pred = val_pred.cpu()
                 val_loss = loss_fn(val_pred, labels)
                 total_val_loss += round(val_loss.item(), 2)

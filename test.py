@@ -5,7 +5,7 @@ import argparse
 from tqdm import tqdm
 import math
 import yaml
-from utils import check_correct, aggregate_attentions, save_attention_plots, count_parameters
+from utils import check_correct, aggregate_attentions, save_attention_plots, count_parameters,  slowfast_input_transform
 from torch.optim.lr_scheduler import LambdaLR
 from datetime import datetime, timedelta
 from statistics import mean
@@ -67,9 +67,9 @@ if __name__ == "__main__":
     parser.add_argument('--config', type=str, 
                         help="Which configuration to use. See into 'config' folder.")
     parser.add_argument('--model', type=int, 
-                        help="Which model to use. (0: Baseline | 1: Size Invariant TimeSformer).")
+                        help="Which model to use. (0: Baseline | 1: Size Invariant TimeSformer | 2: SlowFast).")
     parser.add_argument('--identities_ordering', type=int,  default = 0,
-                        help="Which ordering rule to use. (0: Size-based | 1: Length-based | 2: Random).")
+                        help="Which ordering rule to use. (0: Size-based | 1: Frequency-based | 2: Random).")
     parser.add_argument('--save_attentions', default=False, action="store_true",
                         help='Save attentions plots.')
     opt = parser.parse_args()
@@ -78,7 +78,7 @@ if __name__ == "__main__":
     with open(opt.config, 'r') as ymlfile:
         config = yaml.safe_load(ymlfile)
 
-    os.environ["CUDA_VISIBLE_DEVICES"] = "1,2,3"
+    os.environ["CUDA_VISIBLE_DEVICES"] = "2"
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
@@ -95,29 +95,40 @@ if __name__ == "__main__":
     np.random.seed(opt.random_state)
    
     # Load required weights for feature extractor
-    if opt.extractor_model == 0: # EfficientNet-B0
-        if opt.extractor_weights.lower() == 'imagenet':
-            features_extractor = EfficientNet.from_pretrained('efficientnet-b0')
-        else:
-            features_extractor = EfficientNet.from_name('efficientnet-b0')
-            features_extractor.load_matching_state_dict(torch.load(opt.extractor_weights, map_location=torch.device('cpu')))
-            print("Custom features extractor weights loaded.")
-    else: # XceptionNet
-        if opt.extractor_weights.lower() == 'pretrained':
-            features_extractor = xception(num_classes=1, pretrain_path="weights/ckpt_iter.pth.tar")
-        else:
-            features_extractor = xception(num_classes=1, pretrain_path=opt.extractor_weights)
+    if opt.model != 2:
+        if opt.extractor_model == 0: # EfficientNet-B0
+            if opt.extractor_weights.lower() == 'imagenet':
+                features_extractor = EfficientNet.from_pretrained('efficientnet-b0')
+            else:
+                features_extractor = EfficientNet.from_name('efficientnet-b0')
+                features_extractor.load_matching_state_dict(torch.load(opt.extractor_weights, map_location=torch.device('cpu')))
+                print("Custom features extractor weights loaded.")
+        else: # XceptionNet
+            if opt.extractor_weights.lower() == 'pretrained':
+                features_extractor = xception(num_classes=1, pretrain_path="weights/ckpt_iter.pth.tar")
+            else:
+                features_extractor = xception(num_classes=1, pretrain_path=opt.extractor_weights)
+    else:
+        features_extractor = None
 
     # Init the required model
     if opt.model == 0:
         model = Baseline(config=config)
         num_patches = None
-    else:
+    elif opt.model == 1:
         model = SizeInvariantTimeSformer(config=config, require_attention=True)
         num_patches = config['model']['num-patches']
+    elif opt.model == 2:
+        torch.hub._validate_not_a_forked_repo=lambda a,b,c: True
+        model = torch.hub.load('facebookresearch/pytorchvideo', 'slowfast_r50', pretrained=True)   
+        output_layer = torch.nn.Linear(2304 , 1)
+        model.blocks[6].proj = output_layer
+        num_patches = None
 
-    
-    features_extractor = torch.nn.DataParallel(features_extractor)
+
+    if features_extractor != None:
+        features_extractor = torch.nn.DataParallel(features_extractor)
+
     model = torch.nn.DataParallel(model)
 
 
@@ -129,11 +140,12 @@ if __name__ == "__main__":
     loss_fn = torch.nn.BCEWithLogitsLoss()
 
     # Move into GPU
-    features_extractor = features_extractor.to(device)   
-    print("Extractor Parameters: ", count_parameters(features_extractor))  
+    if features_extractor != None:
+        features_extractor = features_extractor.to(device)   
+        features_extractor.eval()
+        print("Extractor Parameters: ", count_parameters(features_extractor))  
     print("Model Parameters: ", count_parameters(model)) 
     model = model.to(device)
-    features_extractor.eval()
     model.eval()
        
     # Read all the paths and initialize data loaders for train and validation
@@ -215,29 +227,42 @@ if __name__ == "__main__":
     for index, (videos, size_embeddings, masks, identities_masks, positions, tokens_per_identity, labels, multiclass_labels, video_ids) in enumerate(test_dl):
         b, f, h, w, c = videos.shape
         labels = labels.unsqueeze(1).float()
-        videos = videos.to(device)
         identities_masks = identities_masks.to(device)
         masks = masks.to(device)
         positions = positions.to(device)
 
         with torch.no_grad():
-            videos = rearrange(videos, "b f h w c -> (b f) c h w")
-            features = features_extractor(videos)  
-            if opt.model == 0: 
-                test_pred = model(features)
-                test_pred = torch.mean(test_pred.reshape(-1, config["model"]["num-frames"]), axis=1).unsqueeze(1)
-            elif opt.model == 1:
-                features = rearrange(features, '(b f) c h w -> b f c h w', b = b, f = f)
-                test_pred, attentions = model(features, mask=masks, size_embedding=size_embeddings, identities_mask=identities_masks, positions=positions)
-                if opt.save_attentions:
-                    identity_names = [row[0] for row in tokens_per_identity]
-                    frames_per_identity = [int(row[1] / config["model"]["num-patches"]) for row in tokens_per_identity]
+            
+            if opt.model != 2: # Use the features extractor
+                videos = rearrange(videos, "b f h w c -> (b f) c h w")
+                videos = videos.to(device)
+                
+                features = features_extractor(videos)  
+                if opt.model == 0: 
+                    test_pred = model(features)
+                    test_pred = torch.mean(test_pred.reshape(-1, config["model"]["num-frames"]), axis=1).unsqueeze(1)
+                elif opt.model == 1:
+                    features = rearrange(features, '(b f) c h w -> b f c h w', b = b, f = f)
+                    test_pred, attentions = model(features, mask=masks, size_embedding=size_embeddings, identities_mask=identities_masks, positions=positions)
+                    if opt.save_attentions:
+                        identity_names = [row[0] for row in tokens_per_identity]
+                        frames_per_identity = [int(row[1] / config["model"]["num-patches"]) for row in tokens_per_identity]
+                        
+                        aggregated_attentions, identity_attentions = aggregate_attentions(attentions, config['model']['heads'], config['model']['num-frames'], frames_per_identity)
+                        
+                        save_attention_plots(aggregated_attentions, identity_names, frames_per_identity, config['model']['num-frames'], video_ids[0])
+            elif opt.model == 2:
+                videos = rearrange(videos, 'b f h w c -> b c f h w')
+                videos = slowfast_input_transform(videos)
+                videos = [torch.cat([v[None, ...].to(device) for v in videos[0]]), torch.cat([v[None, ...].to(device) for v in videos[1]])]
+                test_pred = model(videos)
                     
-                    aggregated_attentions, identity_attentions = aggregate_attentions(attentions, config['model']['heads'], config['model']['num-frames'], frames_per_identity)
-                    
-                    save_attention_plots(aggregated_attentions, identity_names, frames_per_identity, config['model']['num-frames'], video_ids[0])
+        
+        if opt.model != 2:
+            videos = videos.cpu()
+        else:
+            videos = [torch.cat([v[None, ...].cpu() for v in videos[0]]), torch.cat([v[None, ...].cpu() for v in videos[1]])]
 
-        videos = videos.cpu()
         test_pred = test_pred.cpu()
         
         test_loss = loss_fn(test_pred, labels)

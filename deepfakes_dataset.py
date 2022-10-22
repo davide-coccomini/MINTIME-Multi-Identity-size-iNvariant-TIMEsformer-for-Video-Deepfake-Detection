@@ -274,8 +274,12 @@ class DeepFakesDataset(Dataset):
                 diff = max_faces - len(identity_size_embeddings)
                 identity_size_embeddings = np.concatenate((identity_size_embeddings, np.zeros(diff)))
                 identity_images.extend([np.zeros((self.image_size, self.image_size, 3), dtype=np.uint8) for i in range(diff)])
-                images_frames.extend([max(images_frames) for i in range(diff)])
-
+                try:
+                    images_frames.extend([max(images_frames) for i in range(diff)])
+                except:
+                    print("Error", original_video_path)
+                    images_frames.extend([0 for i in range(diff)])
+                    
             if self.enable_identity_attention and len(identity_images) < max_faces: # Calculate attention only between faces of the same identity
                 mask.extend([1 if i < max_faces - diff else 0 for i in range(max_faces)])
             else: # Otherwise all the faces are valid

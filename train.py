@@ -38,7 +38,7 @@ from contextlib import redirect_stderr
 import sys
 
 if __name__ == "__main__":
-    os.environ["CUDA_VISIBLE_DEVICES"] = "0,1"
+    os.environ["CUDA_VISIBLE_DEVICES"] = "1,2"
     parser = argparse.ArgumentParser()
     
     parser.add_argument('--train_list_file', default="../../datasets/ForgeryNet/faces/train_and_val.csv", type=str,
@@ -359,8 +359,10 @@ if __name__ == "__main__":
                 y_pred = model(videos)
                 
             # Calculate loss
-            
-            videos = [torch.cat([v[None, ...].cpu() for v in videos[0]]), torch.cat([v[None, ...].cpu() for v in videos[1]])]
+            if opt.model != 2:
+                videos = videos.cpu()
+            else:
+                videos = [torch.cat([v[None, ...].cpu() for v in videos[0]]), torch.cat([v[None, ...].cpu() for v in videos[1]])]
             y_pred = y_pred.cpu()
             loss = loss_fn(y_pred, labels)
             corrects, positive_class, negative_class = check_correct(y_pred, labels)  

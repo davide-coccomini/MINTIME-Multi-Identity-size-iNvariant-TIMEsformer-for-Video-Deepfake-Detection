@@ -27,6 +27,7 @@ from models.baseline import Baseline
 import os
 from einops import rearrange
 from utils import aggregate_attentions, draw_border, save_attention_plots
+from models.xception import xception
 
 
 
@@ -146,7 +147,7 @@ def cluster_faces(crops, valid_cluster_size_ratio = 0.20, similarity_threshold =
     crops_images = [row[1] for row in crops]
     
     # Extract the embeddings
-    embeddings_extractor = InceptionResnetV1(pretrained='vggface2').eval().to(opt.gpu_id)
+    embeddings_extractor = InceptionResnetV1(pretrained='vggface2').eval().to(device)
     faces = [preprocess_images(face) for face in crops_images]
     faces = np.stack([np.uint8(face) for face in faces])
     faces = torch.as_tensor(faces)
@@ -354,19 +355,32 @@ def generate_masks(video_path, identities, discarded_faces, num_frames, image_si
 def predict(video_path, clustered_faces, config, opt, discarded_faces = None):
 
     # Load required weights for feature extractor
-    if opt.extractor_weights.lower() == 'imagenet':
-        features_extractor = EfficientNet.from_pretrained('efficientnet-b0')
-    else:
-        features_extractor = EfficientNet.from_name('efficientnet-b0')
-        features_extractor.load_matching_state_dict(torch.load(opt.extractor_weights, map_location=torch.device('cpu')))
+    if opt.extractor_model == 0: # EfficientNet-B0
+        if opt.extractor_weights.lower() == 'imagenet':
+            features_extractor = EfficientNet.from_pretrained('efficientnet-b0')
+        else:
+            features_extractor = EfficientNet.from_name('efficientnet-b0')
+            features_extractor.load_matching_state_dict(torch.load(opt.extractor_weights, map_location=torch.device('cpu')))
+            print("Custom features extractor weights loaded.")
+    else: # XceptionNet
+        if opt.extractor_weights.lower() == 'pretrained':
+            features_extractor = xception(num_classes=1, pretrain_path="weights/ckpt_iter.pth.tar")
+        else:
+            features_extractor = xception(num_classes=1, pretrain_path=opt.extractor_weights)
+
+
 
     # Init the model
     model = SizeInvariantTimeSformer(config=config, require_attention=True)
     num_patches = config['model']['num-patches']
 
+    
+    features_extractor = torch.nn.DataParallel(features_extractor)
+    model = torch.nn.DataParallel(model)
+
     # Move into GPU
-    features_extractor = features_extractor.to(opt.gpu_id)    
-    model = model.to(opt.gpu_id)
+    features_extractor = features_extractor.to(device)    
+    model = model.to(device)
     features_extractor.eval()
     model.eval()
 
@@ -378,10 +392,10 @@ def predict(video_path, clustered_faces, config, opt, discarded_faces = None):
     identities, discarded_faces  = get_sorted_identities(clustered_faces, discarded_faces)
     videos, size_embeddings, mask, identities_mask, positions, tokens_per_identity = generate_masks(video_path, identities, discarded_faces, config["model"]["num-frames"], config["model"]["image-size"], config["model"]["num-patches"])
     b, f, h, w, c = videos.shape
-    videos = videos.to(opt.gpu_id)    
-    identities_mask = identities_mask.to(opt.gpu_id)
-    mask = mask.to(opt.gpu_id)
-    positions = positions.to(opt.gpu_id)
+    videos = videos.to(device)    
+    identities_mask = identities_mask.to(device)
+    mask = mask.to(device)
+    positions = positions.to(device)
     
 
     with torch.no_grad():
@@ -394,10 +408,12 @@ def predict(video_path, clustered_faces, config, opt, discarded_faces = None):
         identity_names = [row[0] for row in tokens_per_identity]
         frames_per_identity = [int(row[1] / config["model"]["num-patches"]) for row in tokens_per_identity]
         
-        aggregated_attentions, identity_attentions = aggregate_attentions(attentions, config['model']['heads'], config['model']['num-frames'], frames_per_identity)
-
-        save_attention_plots(aggregated_attentions, identity_names, frames_per_identity, config['model']['num-frames'], os.path.basename(video_path))
-
+        if opt.save_attentions:
+            aggregated_attentions, identity_attentions = aggregate_attentions(attentions, config['model']['heads'], config['model']['num-frames'], frames_per_identity)
+            save_attention_plots(aggregated_attentions, identity_names, frames_per_identity, config['model']['num-frames'], os.path.basename(video_path))
+        else:
+            identity_attentions = []
+            aggregated_attentions = []
         return torch.sigmoid(test_pred[0]).item(), identity_attentions, aggregated_attentions, identities, frames_per_identity
 
 def get_identities_bboxes(identities):
@@ -482,11 +498,20 @@ if __name__ == "__main__":
                         help="Which configuration to use. See into 'config' folder.")
     parser.add_argument('--model_weights', type=str,
                         help='Model weights.')
+    parser.add_argument('--extractor_model', type=int, default=0, 
+                        help="Which model use for features extraction (0: EfficientNet; 1: XceptionNet).")
     parser.add_argument('--extractor_weights', default='ImageNet', type=str,
                         help='Path to extractor weights or "imagenet".')
+    parser.add_argument('--output_type', default=0, type=int,
+                        help='Specify which type of output is requested (0: Prediction; 1: Video)".')
+    parser.add_argument('--save_attentions', default=False, action="store_true",
+                        help='Save attentions plots.')
 
     opt = parser.parse_args()
     print(opt)
+    
+    os.environ["CUDA_VISIBLE_DEVICES"] = "0,1"
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     with open(opt.config, 'r') as ymlfile:
         config = yaml.safe_load(ymlfile)
 
@@ -532,5 +557,7 @@ if __name__ == "__main__":
         print("The video is fake ("+str(round(pred*100,2)) + "%), showing video result...")
     else:
         print("The video is pristine ("+str(round((1-pred)*100,2)) + "%), showing video result...")
-
-    generate_output_video(opt.video_path, pred, identity_attentions, aggregated_attentions, identities, frames_per_identity)
+    if opt.output_type == 0:
+        print("Prediction", pred)
+    else:
+        generate_output_video(opt.video_path, pred, identity_attentions, aggregated_attentions, identities, frames_per_identity)

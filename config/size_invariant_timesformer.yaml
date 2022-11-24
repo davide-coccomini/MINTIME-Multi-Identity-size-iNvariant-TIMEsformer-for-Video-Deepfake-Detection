@@ -1,16 +1,16 @@
 training:
-  lr: 0.0001
+  lr: 0.01
   weight-decay: 0.0001
-  bs: 64
-  val_bs: 64
-  optimizer: 'AdamW'
+  bs: 32
+  val_bs: 32
+  optimizer: 'SGD'
   scheduler: 'cosinelr' 
   gamma: 0.1
   step-size: 5
   augmentation: 'max' # min/max
 
 test:
-  bs: 16
+  bs: 32
 
 model:
   image-size: 224
@@ -22,10 +22,10 @@ model:
   dim: 512
   depth: 9 # 9 v2 3 v3
   dim-head: 64
-  channels: 2048
+  channels: 2048 # Xception: 2048 | EfficientNet: 1280
   heads: 8
-  attn-dropout: 0.05
-  ff-dropout: 0.05
+  attn-dropout: 0.
+  ff-dropout: 0.
   shift-tokens: False
   enable-size-emb: True
   enable-pos-emb: True

@@ -58,19 +58,20 @@ In this case, the attention in frame 20 of the second identity is particularly h
 ## Model ZOO
 
 ### Models comparison
-| Model | Identities | Accuracy | AUC  |  Download |
-| --------------- | --------------- | --------------- | --------------- | --------------- |
-| MINTIME-XC | 1 | 85.96 | 93.20 | LINK |
-| MINTIME-XC | 2 | 87.64 | 94.25 | LINK |
-| MINTIME-XC | 3 | 86.98 | 94.10 | LINK |
-| SlowFast R-50 | 1 | 88.78 | 93.88 | N/A |
-| X3D-M | 1 | 87.93 | 93.75 | N/A |
-| MINTIME-EF | 1 | 81.92 | 90.13 | LINK |
-| MINTIME-EF | 2 | 82.28 | 90.45 | LINK |
-| MINTIME-EF | 3 | 82.05 | 90.28 | LINK |
-| EfficientNet-B0 + MLP | 1 | 65.33 | 71.42 | LINK |
-| EfficientNet-B0 + MLP | 2 | 67.03 | 71.05 | LINK |
-| EfficientNet-B0 + MLP | 3 | 66.89 | 70.92 | LINK |
+| Model | Identities | Accuracy | AUC  |
+| --------------- | --------------- | --------------- | --------------- | 
+| MINTIME-XC | 1 | 85.96 | 93.20 |
+| MINTIME-XC | 2 | 87.64 | 94.25 |
+| MINTIME-XC | 3 | 86.98 | 94.10 |
+| SlowFast R-50 Retrained | 1 | 82.59 | 93.88 |
+| SlowFast R-50 | 1 | 88.78 | 93.88 | 
+| X3D-M | 1 | 87.93 | 93.75 |
+| MINTIME-EF | 1 | 81.92 | 90.13 | 
+| MINTIME-EF | 2 | 82.28 | 90.45 |
+| MINTIME-EF | 3 | 82.05 | 90.28 |
+| EfficientNet-B0 + MLP | 1 | 65.33 | 71.42 |
+| EfficientNet-B0 + MLP | 2 | 67.03 | 71.05 |
+| EfficientNet-B0 + MLP | 3 | 66.89 | 70.92 |
 
 
 ###  Multi-Identity videos only
@@ -80,6 +81,7 @@ Accuracy obtained from models on multi-identity videos only.
 | ----  |   ----   | ---- |
 | MINTIME-XC | 86.68  | 94.12 |
 | MINTIME-EF | 81.21  | 89.56 |
+| SlowFast R-50 Retrained | 72.63 | 80.92 |
 | EfficientNet-B0 + MLP | 67.69 | 74.26 |
 
 
@@ -89,14 +91,17 @@ Accuracy obtained by the models on the various deepfake generation methods in th
 | --------------- | --------------- | --------------- | --------------- | --------------- | --------------- | --------------- | --------------- | --------------- | --------------- | --------------- |
 | MINTIME-XC              | 88.15   |  79.94   |  84.64   | 82.17    |   84.05  |  77.59   |  85.37   |  92.03   | 79.91 |  14.06 |
 | MINTIME-EF              | 85.84   |  70.05   |  69.75   |  74.55   |   82.05  |  78.14   |  79.59   |  91.49   |  77.03   | 14.16 |
+| SlowFast R-50 Retrained | 84.65 | 69.70 | 71.71 | 81.19 | 81.35 | 78.67 | 88.43 | 88.96 | 92.05 | 15.34 | 22.36 |
 | EfficientNet-B0 + MLP | 51.68   |  67.67   |  84.41   |  67.58   |   65.80  |  78.68   |  69.72   |  92.87   |  79.04   | 48.31 |
 
 
 ### Size Embedding evaluation
 | Model | Identities| Accuracy | AUC  |
 | --------------- | --------------- | --------------- | --------------- | 
-| MINTIME with size-embedding | 2 | 82.05 | 90.28 |
-| MINTIME w/o size-embedding | 2 | 81.83 | 90.13 |
+| MINTIME-EF with size-embedding | 2 | 82.05 | 90.28 |
+| MINTIME-EF w/o size-embedding | 2 | 81.83 | 90.13 |
+| MINTIME-XC with size-embedding | 2 | 87.64 | 94.25 |
+| MINTIME-XC w/o size-embedding | 2 | 87.13 | 94.03 |
 
 
 
@@ -140,6 +145,7 @@ Accuracy obtained by the models on the various deepfake generation methods in th
 | LipForensics | 1 | 73.50 |
 | FTCN | 1 | 74.00 |
 | RealForensics | 1 | 75.90 |
+| MINTIME-EF | 2 | 68.57 |
 | MINTIME-XC | 2 | 77.92 |
 
 
@@ -149,10 +155,10 @@ Considering only multi-identity videos
 
 | Model | Identities | Temporal Positional Embedding | Multi-Identity Attention | AUC |
 | --------------- | --------------- | --------------- | --------------- | --------------- |
-| MINTIME-XF | 2  |      ✓                            |      ✓         |        94.12    | 
-| MINTIME-XF | 2  |      X                            |      X         |         93.29    |  
-| MINTIME-XF | 3  |      ✓                            |      ✓         |       93.32     |  
-| MINTIME-XF | 3  |      X                            |      X         |        90.57     |  
+| MINTIME-XC | 2  |      ✓                            |      ✓         |        94.12    | 
+| MINTIME-XC | 2  |      X                            |      X         |         93.29    |  
+| MINTIME-XC | 3  |      ✓                            |      ✓         |       93.32     |  
+| MINTIME-XC | 3  |      X                            |      X         |        90.57     |  
 
 
 ## Dataset
@@ -311,6 +317,8 @@ The dataset at the end of this process will have the following structure:
                     ...
 
 ```
+
+This split was used only as an additional experimental field but all the reported results are obtained on the ForgeryNet Validation set.
 
 ### Identity Clustering
 Having to manage multi-face videos and wanting to detect temporal and not just spatial anomalies, it is necessary to clustered the faces in each video on the basis of their similarity and maintaining the temporal order of their appearance in the frames. To do this, a clustering algorithm was developed that groups the faces extracted from the videos into sequences. 
@@ -496,4 +504,15 @@ In almost all the scripts the following parameters can be also customized:
 - --random_state: Random state number for reproducibility (default: 42)
 
 # Reference
-TODO
+```
+@misc{https://doi.org/10.48550/arxiv.2211.10996,
+  doi = {10.48550/ARXIV.2211.10996},
+  url = {https://arxiv.org/abs/2211.10996},
+  author = {Coccomini, Davide Alessandro and Zilos, Giorgos Kordopatis and Amato, Giuseppe and Caldelli, Roberto and Falchi, Fabrizio and Papadopoulos, Symeon and Gennaro, Claudio},
+  keywords = {Computer Vision and Pattern Recognition (cs.CV), FOS: Computer and information sciences, FOS: Computer and information sciences},
+  title = {MINTIME: Multi-Identity Size-Invariant Video Deepfake Detection},
+  publisher = {arXiv},
+  year = {2022},
+  copyright = {arXiv.org perpetual, non-exclusive license}
+}
+```

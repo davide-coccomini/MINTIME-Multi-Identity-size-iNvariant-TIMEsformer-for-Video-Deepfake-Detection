@@ -68,7 +68,7 @@ In this case, the attention in frame 20 of the second identity is particularly h
 | MINTIME-XC | 1 | 85.96 | 93.20 |
 | MINTIME-XC | 2 | 87.64 | 94.25 |
 | MINTIME-XC | 3 | 86.98 | 94.10 |
-| SlowFast R-50 Retrained | 1 | 82.59 | 93.88 |
+| SlowFast R-50 Retrained | 1 | 82.59 | 90.86 |
 | SlowFast R-50 | 1 | 88.78 | 93.88 | 
 | X3D-M | 1 | 87.93 | 93.75 |
 | MINTIME-EF | 1 | 81.92 | 90.13 | 

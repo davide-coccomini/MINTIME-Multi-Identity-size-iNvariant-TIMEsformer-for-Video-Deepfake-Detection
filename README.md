@@ -62,6 +62,8 @@ In this case, the attention in frame 20 of the second identity is particularly h
 
 ## Model ZOO
 
+To download the pre-trained models available <a href="https://drive.google.com/drive/folders/1ti3U5jZULTgwx-sik9XjJDEB1_2hAsgi?usp=sharing">click here</a>.
+
 ### Models comparison
 | Model | Identities | Accuracy | AUC  |
 | --------------- | --------------- | --------------- | --------------- | 

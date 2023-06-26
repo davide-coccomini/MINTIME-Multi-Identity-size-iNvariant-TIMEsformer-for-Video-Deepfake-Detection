@@ -20,7 +20,7 @@ The new features, strengths and advantages introduced by our approach are as fol
 - Ability to handle different face-frame area ratios through the introduction of 'Size Embedding'. Typically in deepfake detection systems, the person's face is extracted from the video or image to be classified and before being given as input to a neural model it is rescaled to be uniform with all the others. This results in an important loss of information, namely the ratio of the area of the subject's face to the rest of the scene. This may be reflected in missclassification with faces with a particular ratio being classified as fakes even though they are not.
 - Explainability of the results by analyzing the attention maps produced by the model. By looking at the attention values assigned by the model to the tokens associated with the individual faces as input, it is possible to obtain a more refined classification that is not only limited to saying whether or not the video is fake but also which of the multiple identities, if any, were manipulated and at what point in the video.
 - Near state-of-the-art results on ForgeryNet dataset.
-- Generalization capability on unseen deepfake generation methods demonstrated by analyzing the results obtained on approaches not considered in the training set obtaining pr surpassing state-of-the-art accuracies on all setups.
+- Generalization capability on unseen deepfake generation methods demonstrated by analyzing the results obtained on approaches not considered in the training set obtaining or surpassing state-of-the-art accuracies on all setups.
   
 
 ## Setup

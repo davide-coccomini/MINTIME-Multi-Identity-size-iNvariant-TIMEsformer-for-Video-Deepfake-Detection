@@ -57,6 +57,11 @@ In this case, the attention in frame 20 of the second identity is particularly h
 
 ## Model ZOO
 
+
+F1: 0.6747648092628967 Accuracy 0.5659192825112107 AUC 0.5871455692575207
+F1: 0.5386775235153728 Accuracy 0.5466022766471197 AUC 0.5853175491707239
+
+
 ### Models comparison
 | Model | Identities | Accuracy | AUC  |  Download |
 | --------------- | --------------- | --------------- | --------------- | --------------- |
@@ -65,6 +70,8 @@ In this case, the attention in frame 20 of the second identity is particularly h
 | MINTIME-XC | 3 | 86.98 | 94.10 | LINK |
 | SlowFast R-50 | 1 | 88.78 | 93.88 | N/A |
 | X3D-M | 1 | 87.93 | 93.75 | N/A |
+| FTCN (Mean) | 1 | 56.59 | 58.71 | N/A |
+| FTCN (Max) | 1 | 54.66 | 58.53 | N/A |
 | MINTIME-EF | 1 | 81.92 | 90.13 | LINK |
 | MINTIME-EF | 2 | 82.28 | 90.45 | LINK |
 | MINTIME-EF | 3 | 82.05 | 90.28 | LINK |
@@ -75,9 +82,10 @@ In this case, the attention in frame 20 of the second identity is particularly h
 
 ###  Multi-Identity videos only
 Accuracy obtained from models on multi-identity videos only.
-
 | Model | Accuracy | AUC |
 | ----  |   ----   | ---- |
+| FTCN (Mean)|  52.27 | 54.62 |
+| FTCN (Max) | 53.64  | 57.21 |
 | MINTIME-XC | 86.68  | 94.12 |
 | MINTIME-EF | 81.21  | 89.56 |
 | EfficientNet-B0 + MLP | 67.69 | 74.26 |

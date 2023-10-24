@@ -1,8 +1,8 @@
 training:
   lr: 0.01
   weight-decay: 0.0001
-  bs: 32
-  val_bs: 32
+  bs: 8 #32
+  val_bs: 8 #32
   optimizer: 'SGD'
   scheduler: 'cosinelr' 
   gamma: 0.1
@@ -10,7 +10,7 @@ training:
   augmentation: 'max' # min/max
 
 test:
-  bs: 32
+  bs: 1
 
 model:
   image-size: 224

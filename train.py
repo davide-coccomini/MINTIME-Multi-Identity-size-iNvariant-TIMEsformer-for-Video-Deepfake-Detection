@@ -1,6 +1,5 @@
 # The training process is conducted using this code and it can be customized on the specific model that you want to train.
 
-import torch
 import numpy as np
 import argparse
 from tqdm import tqdm
@@ -36,11 +35,12 @@ import pytorchvideo
 from pytorchvideo.models.hub.slowfast import _slowfast
 from contextlib import redirect_stderr
 import sys
+os.environ["CUDA_VISIBLE_DEVICES"] = "1" 
+
+import torch
 
 if __name__ == "__main__":
-    os.environ["CUDA_VISIBLE_DEVICES"] = "1,2"
     parser = argparse.ArgumentParser()
-    
     parser.add_argument('--train_list_file', default="../../datasets/ForgeryNet/faces/train_and_val.csv", type=str,
                         help='Training List txt file path)')
     parser.add_argument('--validation_list_file', default="../../datasets/ForgeryNet/faces/test.csv", type=str,
@@ -170,6 +170,7 @@ if __name__ == "__main__":
                     param.requires_grad = True
 
         # Move models to GPU 
+        print(device, torch.cuda.device_count())
         features_extractor = features_extractor.to(device)   
 
     model = model.to(device)

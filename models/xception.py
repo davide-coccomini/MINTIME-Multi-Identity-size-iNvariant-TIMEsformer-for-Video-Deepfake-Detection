@@ -242,7 +242,10 @@ def get_model_size(model):
 def xception(pretrain_path=None, **kwargs):
     model = Xception(**kwargs)
     if pretrain_path != None:
-        state_dict = torch.load(pretrain_path)['state_dict']
+        state_dict = torch.load(pretrain_path)
+        if 'state_dict' in state_dict.keys():
+            state_dict = torch.load(pretrain_path)
+
         '''
         for name, weights in state_dict.items():
             if 'pointwise' in name:

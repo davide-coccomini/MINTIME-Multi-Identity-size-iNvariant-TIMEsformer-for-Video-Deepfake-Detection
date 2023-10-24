@@ -200,11 +200,12 @@ class DeepFakesDataset(Dataset):
         video_id =  video_path.split(self.mode + os.path.sep)[1]
 
         original_video_path = os.path.join(self.video_path, self.mode, video_id)
+        if ".mp4" not in original_video_path:
+            original_video_path += ".mp4"
         if not os.path.exists(original_video_path) and self.mode == "val":
             original_video_path = os.path.join(self.video_path, "train", video_id)
 
-        if ".mp4" not in original_video_path:
-            original_video_path += ".mp4"
+
             
         if not os.path.exists(original_video_path):
             raise Exception("Invalid video path for video.", original_video_path)

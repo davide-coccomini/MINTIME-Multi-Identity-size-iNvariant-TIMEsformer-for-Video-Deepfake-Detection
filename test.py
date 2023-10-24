@@ -78,7 +78,7 @@ if __name__ == "__main__":
     with open(opt.config, 'r') as ymlfile:
         config = yaml.safe_load(ymlfile)
 
-    os.environ["CUDA_VISIBLE_DEVICES"] = "2"
+    os.environ["CUDA_VISIBLE_DEVICES"] = "0,1"
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
@@ -126,10 +126,11 @@ if __name__ == "__main__":
         num_patches = None
 
 
-    if features_extractor != None:
+    if features_extractor != None and opt.gpu_id == -1:
         features_extractor = torch.nn.DataParallel(features_extractor)
 
-    model = torch.nn.DataParallel(model)
+    if opt.gpu_id == -1:
+        model = torch.nn.DataParallel(model)
 
 
     if os.path.exists(opt.model_weights):

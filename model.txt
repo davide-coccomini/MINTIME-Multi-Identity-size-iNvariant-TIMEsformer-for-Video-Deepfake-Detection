@@ -1,0 +1,12 @@
+Namespace(config='config/slowfast.yaml', data_path='../../datasets/ForgeryNet/faces', deepfake_methods=None, extractor_model=0, extractor_unfreeze_blocks=-1, extractor_weights='ImageNet', freeze_backbone=False, gpu_id=-1, logger_name='runs/train/slowfast', max_videos=-1, model=2, models_output_path='outputs/models/slowfast', num_epochs=30, patience=5, random_state=42, restore_epoch=False, resume='', train_list_file='../../datasets/ForgeryNet/faces/train_and_val.csv', validation_list_file='../../datasets/ForgeryNet/faces/test.csv', video_path='../../datasets/ForgeryNet/videos', workers=10)
+Loaded pretrained weights for efficientnet-b0
+Train videos: 163909 Validation videos: 14495
+__TRAINING STATS__
+Counter({1: 90211, 0: 73698})
+Weights 0.8169513695669043
+__VALIDATION STATS__
+Counter({1: 8147, 0: 6348})
+___________________
+No checkpoint loaded for the model.
+
+Loss:  0.59 Accuracy:  0.75 Train 0s:  4 Train 1s: 4 Expected Time: 09:05:27.583136

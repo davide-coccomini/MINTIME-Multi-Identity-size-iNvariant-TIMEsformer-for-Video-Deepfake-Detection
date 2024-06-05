@@ -2,7 +2,7 @@
 
 ![Header](images/header.gif)
 
-# [Preprint](https://arxiv.org/abs/2211.10996)
+# [Paper](https://ieeexplore.ieee.org/document/10547206)
 
 [![PWC](https://img.shields.io/endpoint.svg?url=https://paperswithcode.com/badge/mintime-multi-identity-size-invariant-video/classification-on-forgerynet)](https://paperswithcode.com/sota/classification-on-forgerynet?p=mintime-multi-identity-size-invariant-video)
 
